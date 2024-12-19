@@ -1,0 +1,122 @@
+# Wallet Service ConfigMap v1.0
+# Purpose: Provides comprehensive configuration for the Wallet Service including
+# database connection pooling, secure SSL modes, metrics collection, and optimized cache settings
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wallet-service-config
+  namespace: otpless
+  labels:
+    app: wallet-service
+    component: configuration
+    version: "1.0"
+data:
+  config.yaml: |
+    # Database configuration with enhanced security and connection pooling
+    database:
+      host: ${POSTGRES_HOST}
+      port: 5432
+      user: ${POSTGRES_USER}
+      password: ${POSTGRES_PASSWORD}
+      dbname: wallet_db
+      sslmode: verify-full  # Enforcing SSL verification for security
+      # Connection pool settings for optimal performance
+      connTimeout: 10s
+      maxOpenConns: 50      # Maximum number of open connections
+      maxIdleConns: 10      # Maximum number of idle connections
+      connMaxLifetime: 1h   # Maximum lifetime of connections
+      statementTimeout: 30s # SQL statement timeout
+      # Additional security settings
+      sslcert: /etc/ssl/certs/postgres.crt
+      sslkey: /etc/ssl/private/postgres.key
+      sslrootcert: /etc/ssl/certs/ca.crt
+
+    # Redis cache configuration optimized for wallet balances
+    redis:
+      host: ${REDIS_HOST}
+      port: 6379
+      password: ${REDIS_PASSWORD}
+      db: 0
+      ttl: 30s             # TTL for wallet balance cache as per spec
+      # Connection pool optimization
+      poolSize: 20
+      minIdleConns: 5
+      maxRetries: 3
+      retryBackoff: 100ms
+      # TLS configuration
+      tls:
+        enabled: true
+        minVersion: "1.2"
+        verify: true
+
+    # API server configuration
+    api:
+      host: "0.0.0.0"
+      port: 8080
+      readTimeout: 5s
+      writeTimeout: 10s
+      shutdownTimeout: 30s
+      maxRequestSize: "1MB"
+      corsAllowedOrigins:
+        - "*.otpless.com"
+      # Rate limiting per Technical Specifications 7.1
+      rateLimit:
+        enabled: true
+        requests: 500
+        window: "1m"
+
+    # Enhanced security configuration
+    security:
+      jwtSecret: ${JWT_SECRET}
+      jwtExpiry: 24h
+      # TLS configuration
+      tls:
+        enabled: true
+        minVersion: "1.2"
+        cipherSuites:
+          - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+          - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+      # Security headers
+      headers:
+        hsts: true
+        xssProtection: "1; mode=block"
+        contentSecurityPolicy: "default-src 'self'"
+        frameOptions: "DENY"
+
+    # Metrics configuration aligned with metrics-server
+    metrics:
+      enabled: true
+      port: 9090
+      path: "/metrics"
+      labels:
+        service: wallet-service
+        environment: ${ENV}
+      # Collection settings
+      intervalSeconds: 15
+      # Prometheus integration
+      prometheus:
+        enabled: true
+        defaultMetrics: true
+        goMetrics: true
+        processMetrics: true
+
+    # Logging configuration
+    logging:
+      level: INFO
+      format: json
+      output: stdout
+      includeCallerInfo: true
+      # Fields to include in structured logging
+      fields:
+        service: wallet-service
+        version: "1.0"
+        environment: ${ENV}
+
+    # Circuit breaker configuration for external services
+    circuitBreaker:
+      timeout: 5s
+      maxConcurrentRequests: 100
+      requestVolumeThreshold: 20
+      sleepWindow: 10s
+      errorPercentThreshold: 50
