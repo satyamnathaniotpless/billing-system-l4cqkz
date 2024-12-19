@@ -1,0 +1,45 @@
+apiVersion: v2
+name: event-processor
+description: Event processing service for OTPless billing system handling high-throughput usage event ingestion, validation and reliable delivery to Kafka topics. Supports processing 1000+ events/second with ≤100ms latency for real-time usage metering and aggregation.
+
+type: application
+version: 1.0.0
+appVersion: 1.0.0
+
+keywords:
+  - event-processing
+  - billing
+  - kafka
+  - microservice
+  - high-throughput
+  - real-time
+  - usage-metering
+
+maintainers:
+  - name: OTPless Team
+    email: team@otpless.com
+
+# Dependencies required for event processing functionality
+dependencies:
+  # Kafka for high-throughput event streaming
+  - name: kafka
+    version: ^2.2.4
+    repository: https://charts.bitnami.com/bitnami
+    condition: kafka.enabled
+    
+  # Redis for caching and performance optimization
+  - name: redis
+    version: ^17.0.0 
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+
+annotations:
+  category: Infrastructure
+  licenses: Apache-2.0
+  artifacthub.io/containsSecurityUpdates: "true"
+  artifacthub.io/prerelease: "false"
+  artifacthub.io/recommendations: |
+    - url: https://artifacthub.io/packages/helm/bitnami/kafka
+      title: Required message broker for event streaming
+    - url: https://artifacthub.io/packages/helm/bitnami/redis
+      title: Required caching layer for performance
