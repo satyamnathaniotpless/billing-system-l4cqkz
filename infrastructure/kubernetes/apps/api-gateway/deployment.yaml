@@ -1,0 +1,176 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: otpless
+  labels:
+    app: api-gateway
+    component: gateway
+    tier: dmz
+  annotations:
+    security.otpless.io/compliance: "pci-dss,iso27001"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8001"
+    prometheus.io/path: "/metrics"
+    checksum/config: "${sha256sum configmap.yaml}"
+spec:
+  # High availability configuration with 3 replicas
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+        security-tier: dmz
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8001"
+        prometheus.io/path: "/metrics"
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "api-gateway"
+    spec:
+      # Pod distribution and anti-affinity rules
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - api-gateway
+              topologyKey: kubernetes.io/hostname
+      
+      # Security context for non-root execution
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+      - name: kong
+        image: kong:3.0-alpine # version 3.0-alpine as specified in imports
+        imagePullPolicy: Always
+        
+        # Port configurations
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        - name: https
+          containerPort: 8443
+          protocol: TCP
+        - name: admin
+          containerPort: 8001
+          protocol: TCP
+        - name: admin-ssl
+          containerPort: 8444
+          protocol: TCP
+        - name: metrics
+          containerPort: 9542
+          protocol: TCP
+
+        # Resource limits for performance requirements
+        resources:
+          requests:
+            cpu: "1000m"
+            memory: "1Gi"
+          limits:
+            cpu: "2"
+            memory: "2Gi"
+
+        # Health check probes
+        livenessProbe:
+          httpGet:
+            path: /status
+            port: 8001
+            scheme: HTTP
+          initialDelaySeconds: 10
+          timeoutSeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /status
+            port: 8001
+            scheme: HTTP
+          initialDelaySeconds: 5
+          timeoutSeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+
+        startupProbe:
+          httpGet:
+            path: /status
+            port: 8001
+          failureThreshold: 30
+          periodSeconds: 10
+
+        # Configuration and certificate volume mounts
+        volumeMounts:
+        - name: kong-config
+          mountPath: /etc/kong
+          readOnly: true
+        - name: ssl-certs
+          mountPath: /etc/ssl/kong
+          readOnly: true
+
+        # Environment variables
+        env:
+        - name: KONG_DATABASE
+          value: "off"
+        - name: KONG_PROXY_ACCESS_LOG
+          value: /dev/stdout
+        - name: KONG_ADMIN_ACCESS_LOG
+          value: /dev/stdout
+        - name: KONG_PROXY_ERROR_LOG
+          value: /dev/stderr
+        - name: KONG_ADMIN_ERROR_LOG
+          value: /dev/stderr
+        - name: KONG_ADMIN_LISTEN
+          value: "0.0.0.0:8001, 0.0.0.0:8444 ssl"
+        - name: KONG_PROXY_LISTEN
+          value: "0.0.0.0:8000, 0.0.0.0:8443 ssl http2"
+        - name: KONG_PLUGINS
+          value: "bundled,rate-limiting,prometheus"
+        - name: KONG_NGINX_WORKER_PROCESSES
+          value: "auto"
+        - name: KONG_NGINX_WORKER_CONNECTIONS
+          value: "2048"
+
+      # Volume definitions
+      volumes:
+      - name: kong-config
+        configMap:
+          name: api-gateway-config
+      - name: ssl-certs
+        secret:
+          secretName: kong-ssl
+
+      # Service account and termination settings
+      serviceAccountName: api-gateway-sa
+      terminationGracePeriodSeconds: 60
+      
+      # Pod topology spread constraints
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfied: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: api-gateway
