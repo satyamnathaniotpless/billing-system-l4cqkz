@@ -1,0 +1,157 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+yarn.lock.integrity
+package-lock.json.integrity
+
+# Build outputs
+dist
+build
+.next
+out
+*.tsbuildinfo
+
+# Testing and coverage
+coverage
+.nyc_output
+__tests__
+__mocks__
+*.test.*
+*.spec.*
+*.mock.*
+*.stories.*
+*.cy.*
+*.e2e.*
+
+# Development tools and IDE
+.vscode
+.idea
+.vs
+*.sublime-*
+.project
+.classpath
+.settings
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Version control
+.git
+.gitignore
+.gitattributes
+.github
+.gitlab-ci.yml
+
+# Environment and secrets
+.env
+.env.*
+.env.local
+.env.development
+.env.test
+.env.production
+*.pem
+*.key
+*.cert
+*.crt
+
+# Configuration files
+*.config.js
+*.config.ts
+*.config.json
+.eslintrc*
+.prettierrc*
+.stylelintrc*
+.babelrc*
+.browserslistrc
+jest.config.*
+tsconfig.*
+vite.config.*
+postcss.config.*
+tailwind.config.*
+
+# Development tools
+.husky
+.lint-staged
+.editorconfig
+.npmrc
+.yarnrc
+.nvmrc
+.tool-versions
+
+# Documentation and assets
+*.md
+*.mdx
+LICENSE
+AUTHORS
+CHANGELOG
+docs
+README*
+CONTRIBUTING*
+CODE_OF_CONDUCT*
+
+# Logs and debugging
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+debug.log
+.debug
+
+# Cache directories
+.cache
+.npm
+.yarn
+.eslintcache
+.stylelintcache
+.parcel-cache
+
+# Bundle analysis
+stats.html
+bundle-analysis.html
+.bundle-stats
+
+# Development server
+.dev
+.hot
+.reload
+
+# Temporary files
+tmp
+temp
+*.tmp
+*.temp
+
+# Platform specific
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build tools
+Dockerfile*
+.dockerignore
+docker-compose*
+nginx.conf
+.nginx
+
+# CI/CD
+.gitlab-ci.yml
+.travis.yml
+.circleci
+.github
+.jenkins
+.azure-pipelines
+.drone.yml
+
+# Misc
+.git*
+*.gz
+*.zip
+*.tar
+*.rar
+*.7z
+core.*
