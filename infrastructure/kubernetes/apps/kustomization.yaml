@@ -1,0 +1,174 @@
+# Kustomization configuration for OTPless Internal Billing System
+# Version: v5.0.0
+# Purpose: Orchestrates all application-specific Kubernetes resources with support for
+# multi-environment deployments, high availability, and comprehensive monitoring
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Base namespace for all resources
+namespace: otpless
+
+# Common metadata for all resources
+commonLabels:
+  app.kubernetes.io/part-of: otpless-billing
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/version: ${VERSION}
+  environment: ${ENV}
+
+commonAnnotations:
+  maintainer: otpless-devops
+  environment: ${ENV:production}
+  deployment.kubernetes.io/revision: ${REVISION}
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9090"
+
+# Core application resources
+resources:
+  # Infrastructure components
+  - kafka/values.yaml
+  - redis/values.yaml
+  - minio/values.yaml
+  
+  # Security configurations
+  - network-policies/
+  - rbac/
+  
+  # Monitoring configurations
+  - service-monitors/
+
+# Component configurations
+components:
+  # High Availability configurations
+  - path: components/ha-config
+    patches:
+      - target:
+          kind: Deployment
+        patch: |-
+          - op: add
+            path: /spec/template/spec/topologySpreadConstraints
+            value:
+              - maxSkew: 1
+                topologyKey: topology.kubernetes.io/zone
+                whenUnsatisfiable: DoNotSchedule
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/part-of: otpless-billing
+          - op: add
+            path: /spec/template/spec/affinity/podAntiAffinity
+            value:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/part-of: otpless-billing
+                  topologyKey: topology.kubernetes.io/zone
+
+# Patches for environment-specific configurations
+patches:
+  # Set replica count based on environment
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: ${REPLICA_COUNT:3}
+
+# ConfigMap generators for application configuration
+configMapGenerator:
+  - name: app-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=${ENV:production}
+      - MONITORING_ENABLED=true
+
+# Secret generators for sensitive data
+secretGenerator:
+  - name: app-secrets
+    behavior: merge
+    files:
+      - secrets/tls.key
+      - secrets/tls.crt
+
+# Resource transformers
+transformers:
+  # Add security context to all pods
+  - |-
+    apiVersion: builtin
+    kind: PatchTransformer
+    metadata:
+      name: security-context
+    patch: |-
+      - op: add
+        path: /spec/template/spec/securityContext
+        value:
+          runAsNonRoot: true
+          runAsUser: 1000
+          fsGroup: 2000
+    target:
+      kind: Deployment
+
+# Validation configurations
+configurations:
+  - validation.yaml
+
+# OpenAPI field validation
+openapi:
+  path: schema.json
+
+# Vars for substitution
+vars:
+  - name: NAMESPACE
+    objref:
+      kind: Namespace
+      name: otpless
+      apiVersion: v1
+    fieldref:
+      fieldpath: metadata.name
+
+# Configuration for network policies
+configurations:
+  - networkpolicies.yaml
+
+# Labels to be added to all resources
+labels:
+  - pairs:
+      app: otpless-billing
+      tier: backend
+    includeSelectors: true
+    includeTemplates: true
+
+# Images to be used
+images:
+  - name: kafka
+    newName: confluentinc/cp-kafka
+    newTag: 7.0.0
+  - name: redis
+    newName: redis
+    newTag: 7.0-alpine
+  - name: minio
+    newName: minio/minio
+    newTag: RELEASE.2023-10-07T15-07-38Z
+
+# Replicas configuration for high availability
+replicas:
+  - name: .*
+    count: ${REPLICA_COUNT:3}
+
+# Resource quotas
+quotas:
+  - name: compute-resources
+    hard:
+      requests.cpu: "4"
+      requests.memory: 8Gi
+      limits.cpu: "8"
+      limits.memory: 16Gi
+
+# Health check configurations
+healthChecks:
+  - kind: Deployment
+    name: .*
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 3
