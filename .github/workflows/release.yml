@@ -1,0 +1,189 @@
+name: Production Release
+
+# Trigger on workflow dispatch or release creation
+on:
+  workflow_dispatch:
+  release:
+    types: [created]
+
+# Concurrency control to prevent multiple releases
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+# Security permissions boundary
+permissions:
+  id-token: write # Required for AWS OIDC
+  contents: read
+  packages: write
+  deployments: write
+  security-events: write
+
+# Environment variables
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+  ENVIRONMENT: production
+  CANARY_PERCENTAGE: 20
+  HEALTH_CHECK_TIMEOUT: 300
+  ROLLBACK_THRESHOLD: 5
+
+jobs:
+  # Prepare and validate release artifacts
+  prepare:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Verify CI workflow completions
+        run: |
+          gh api repos/${{ github.repository }}/actions/workflows/backend-ci.yml/runs \
+            --jq '.workflow_runs[0].conclusion' | grep -q "success"
+          gh api repos/${{ github.repository }}/actions/workflows/frontend-ci.yml/runs \
+            --jq '.workflow_runs[0].conclusion' | grep -q "success"
+          gh api repos/${{ github.repository }}/actions/workflows/infrastructure-ci.yml/runs \
+            --jq '.workflow_runs[0].conclusion' | grep -q "success"
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Validate security scans
+        run: |
+          if grep -q "CRITICAL\|HIGH" artifacts/*/security-scan.json; then
+            echo "Critical or high security vulnerabilities found"
+            exit 1
+          fi
+
+  # Build and scan container images
+  build:
+    name: Build Images
+    needs: prepare
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GithubActionsOIDC
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.ECR_REGISTRY }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          version: latest
+          buildkitd-flags: --debug
+
+      # Build API Gateway
+      - name: Build API Gateway
+        uses: docker/build-push-action@v4
+        with:
+          context: ./src/backend/api-gateway
+          push: true
+          tags: ${{ env.ECR_REGISTRY }}/api-gateway:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ github.sha }}
+            ENVIRONMENT=production
+
+      # Build Billing Service
+      - name: Build Billing Service
+        uses: docker/build-push-action@v4
+        with:
+          context: ./src/backend/billing-service
+          push: true
+          tags: ${{ env.ECR_REGISTRY }}/billing-service:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ github.sha }}
+            ENVIRONMENT=production
+
+      # Security scan images
+      - name: Scan container images
+        uses: aquasecurity/trivy-action@v0.10.0
+        with:
+          image-ref: ${{ env.ECR_REGISTRY }}/api-gateway:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+  # Deploy with canary strategy
+  deploy:
+    name: Deploy to Production
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GithubActionsOIDC
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy API Gateway canary
+        run: |
+          kubectl set image deployment/api-gateway \
+            api-gateway=${{ env.ECR_REGISTRY }}/api-gateway:${{ github.sha }} \
+            --namespace production \
+            --record
+
+      - name: Monitor canary health
+        run: |
+          for i in $(seq 1 ${{ env.HEALTH_CHECK_TIMEOUT }}); do
+            if kubectl rollout status deployment/api-gateway -n production; then
+              echo "Deployment successful"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Deployment failed"
+          kubectl rollout undo deployment/api-gateway -n production
+          exit 1
+
+      - name: Progressive traffic shift
+        if: success()
+        run: |
+          kubectl scale deployment/api-gateway \
+            --replicas=$(kubectl get deployment api-gateway -o=jsonpath='{.spec.replicas}') \
+            --namespace production
+
+      - name: Verify deployment metrics
+        run: |
+          if [[ $(kubectl get deployment api-gateway -o=jsonpath='{.status.availableReplicas}') -lt ${{ env.ROLLBACK_THRESHOLD }} ]]; then
+            echo "Insufficient healthy replicas, rolling back"
+            kubectl rollout undo deployment/api-gateway -n production
+            exit 1
+          fi
+
+      - name: Update deployment status
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const status = ${{ job.status }} === 'success' ? 'success' : 'failure';
+            const description = status === 'success' ? 'Deployment completed' : 'Deployment failed';
+            
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: context.payload.deployment.id,
+              state: status,
+              description: description,
+              environment: 'production'
+            });
