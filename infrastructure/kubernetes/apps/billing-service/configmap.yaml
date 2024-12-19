@@ -1,0 +1,197 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: billing-service-config
+  namespace: otpless
+  labels:
+    app: billing-service
+    component: config
+    environment: production
+    managed-by: terraform
+data:
+  # Application Configuration
+  application-config.yaml: |
+    spring:
+      application:
+        name: billing-service
+      profiles:
+        active: production
+    server:
+      port: 8080
+      tomcat:
+        threads:
+          max: 200
+          min-spare: 20
+        max-connections: 10000
+        accept-count: 100
+        connection-timeout: 5000
+      shutdown: graceful
+
+  # Database Configuration
+  database-config.yaml: |
+    spring:
+      jpa:
+        hibernate:
+          ddl-auto: validate
+        show-sql: false
+        properties:
+          hibernate:
+            dialect: org.hibernate.dialect.PostgreSQLDialect
+            jdbc:
+              batch_size: 50
+              time_zone: UTC
+            order_inserts: true
+            order_updates: true
+            query:
+              in_clause_parameter_padding: true
+      datasource:
+        hikari:
+          maximum-pool-size: 20
+          minimum-idle: 5
+          idle-timeout: 300000
+          connection-timeout: 20000
+          max-lifetime: 1200000
+          pool-name: BillingHikariCP
+          leak-detection-threshold: 60000
+
+  # Kafka Configuration
+  kafka-config.yaml: |
+    kafka:
+      consumer:
+        group-id: billing-service-group
+        auto-offset-reset: earliest
+        max:
+          poll:
+            records: 500
+            interval:
+              ms: 300000
+        session:
+          timeout:
+            ms: 45000
+        heartbeat:
+          interval:
+            ms: 3000
+        isolation:
+          level: read_committed
+      producer:
+        acks: all
+        retries: 3
+        batch:
+          size: 16384
+        linger:
+          ms: 1
+        buffer:
+          memory: 33554432
+        compression:
+          type: lz4
+        transaction:
+          timeout:
+            ms: 60000
+      topics:
+        usage-events: usage-events
+        billing-events: billing-events
+        dead-letter: billing-dlq
+      properties:
+        security:
+          protocol: SASL_SSL
+
+  # Cache Configuration
+  cache-config.yaml: |
+    spring:
+      cache:
+        type: redis
+        redis:
+          time-to-live: 3600000
+          cache-null-values: false
+          use-key-prefix: true
+      redis:
+        lettuce:
+          pool:
+            max-active: 8
+            max-idle: 8
+            min-idle: 2
+            max-wait: 1000
+          shutdown-timeout: 200ms
+        connect-timeout: 2000ms
+
+  # Security Configuration
+  security-config.yaml: |
+    security:
+      jwt:
+        token:
+          expire-length: 3600000
+          issuer: otpless-billing
+          audience: billing-service
+          refresh-token-validity: 86400000
+      cors:
+        allowed-origins: https://*.otpless.com
+        allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+        allowed-headers: Authorization,Content-Type,X-Requested-With
+        max-age: 3600
+      headers:
+        frame-options: DENY
+        xss-protection: 1; mode=block
+        content-security-policy: "default-src 'self'; frame-ancestors 'none'"
+        strict-transport-security: max-age=31536000; includeSubDomains
+        referrer-policy: strict-origin-when-cross-origin
+      rate-limit:
+        enabled: true
+        limit: 1000
+        duration: 60
+        headers-enabled: true
+
+  # Monitoring Configuration
+  monitoring-config.yaml: |
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: health,metrics,prometheus
+          base-path: /actuator
+      endpoint:
+        health:
+          show-details: always
+          probes:
+            enabled: true
+          group:
+            readiness:
+              include: db,redis,kafka
+      metrics:
+        tags:
+          application: billing-service
+          environment: production
+        distribution:
+          percentiles-histogram:
+            http:
+              server:
+                requests: true
+        enable:
+          jvm: true
+          process: true
+          system: true
+      tracing:
+        sampling:
+          probability: 1.0
+        baggage:
+          correlation:
+            enabled: true
+
+  # Logging Configuration
+  logging-config.yaml: |
+    logging:
+      level:
+        root: INFO
+        com.otpless.billing: INFO
+        org.springframework: INFO
+        org.hibernate: INFO
+      pattern:
+        console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}/%X{spanId}] %-5level %logger{36} - %msg%n"
+        file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}/%X{spanId}] %-5level %logger{36} - %msg%n"
+      file:
+        name: /var/log/billing-service/application.log
+      logback:
+        rollingpolicy:
+          max-file-size: 10MB
+          max-history: 7
+          total-size-cap: 1GB
+          clean-history-on-start: true
