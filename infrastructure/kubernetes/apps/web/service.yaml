@@ -1,0 +1,34 @@
+# Kubernetes Service manifest for OTPless Internal Billing System web frontend
+# API Version: v1.27.x
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: web
+  namespace: otpless
+  labels:
+    app: web
+    component: frontend
+  annotations:
+    # Enable Prometheus metrics scraping
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "80"
+
+spec:
+  # Using ClusterIP for internal access within the cluster
+  # External access is managed via Ingress
+  type: ClusterIP
+  
+  # Port configuration for HTTP traffic
+  ports:
+    - port: 80          # Service port
+      targetPort: 80    # Container port
+      protocol: TCP     # Using TCP protocol
+      name: http       # Named port for better identification
+  
+  # Pod selector using deployment labels
+  selector:
+    app: web
+  
+  # Disable session affinity for better load distribution
+  sessionAffinity: None
