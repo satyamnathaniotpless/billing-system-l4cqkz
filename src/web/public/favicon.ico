@@ -1,0 +1,40 @@
+File Format: ICO (Windows Icon)
+Dimensions: Multi-size icon containing:
+- 16x16 pixels
+- 32x32 pixels
+
+Color Specifications:
+- Color Depth: 32-bit with alpha channel
+- Primary Color: #1976D2 (Material Design Blue)
+- Background: Transparent
+- Color Profile: RGB
+
+Optimization:
+- Format: ICO with lossless compression
+- Target File Size: < 5KB
+- Transparency: Enabled
+- Pixel-perfect optimization for small sizes
+
+Design Requirements:
+- Material Design 3.0 compliant
+- Clear recognizable branding at small sizes
+- Sharp edges and details
+- WCAG 2.1 AA compliant contrast ratio (minimum 4.5:1)
+- Dark mode compatible without inversion
+
+Cache Headers:
+Cache-Control: public, max-age=604800, immutable
+ETag: Enabled
+
+Browser Support:
+- Chrome (latest 2 versions)
+- Firefox (latest 2 versions)
+- Safari (latest 2 versions)
+- Edge (latest version)
+
+The icon should be created using professional icon design software and exported with the following considerations:
+1. Pixel-perfect alignment at both 16x16 and 32x32 sizes
+2. Proper antialiasing for clean edges
+3. Optimized for both light and dark browser themes
+4. Tested for clarity in browser tabs and bookmarks
+5. Verified for PWA installation compatibility
