@@ -1,0 +1,129 @@
+# Kafka Helm Chart Values
+# Version: 1.0.0
+# Last Updated: 2024
+
+# Global settings
+global:
+  storageClass: "gp3-encrypted"
+  authentication:
+    enabled: true
+    saslMechanisms: "SCRAM-SHA-512"
+    existingSecret: "kafka-auth-secret"
+  tls:
+    enabled: true
+    existingSecret: "kafka-tls-secret"
+    cert:
+      duration: "8760h"  # 1 year
+      renewBefore: "720h"  # 30 days
+
+# Broker configuration
+broker:
+  replicaCount: 3  # Production-grade HA setup
+  heapOpts: "-Xms4g -Xmx4g -XX:+UseG1GC"  # Optimized JVM settings
+  
+  resources:
+    requests:
+      cpu: "2000m"  # 2 vCPU guaranteed
+      memory: "8Gi"  # 8GB guaranteed
+    limits:
+      cpu: "4000m"  # 4 vCPU max
+      memory: "16Gi"  # 16GB max
+  
+  config:
+    auto.create.topics.enable: "false"  # Prevent unauthorized topic creation
+    num.partitions: 12  # Default partitions for scalability
+    default.replication.factor: 3  # High availability replication
+    min.insync.replicas: 2  # Ensure data durability
+    
+    # Performance tuning
+    num.network.threads: 8
+    num.io.threads: 16
+    socket.send.buffer.bytes: 1048576  # 1MB
+    socket.receive.buffer.bytes: 1048576  # 1MB
+    
+    # Data retention
+    log.retention.ms: 604800000  # 7 days
+    log.retention.check.interval.ms: 300000  # 5 minutes
+    
+    # Message configuration
+    compression.type: "lz4"  # Efficient compression
+    message.max.bytes: 1048576  # 1MB max message size
+    replica.fetch.max.bytes: 1048576  # 1MB max fetch size
+
+# Persistence configuration
+persistence:
+  enabled: true
+  size: "500Gi"  # Production-grade storage
+  mountPath: "/bitnami/kafka"
+
+# ZooKeeper configuration
+zookeeper:
+  enabled: true
+  replicaCount: 3  # HA setup
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"
+  persistence:
+    enabled: true
+    size: "50Gi"
+
+# Monitoring configuration
+metrics:
+  kafka:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: "30s"
+      scrapeTimeout: "10s"
+    extraJmxConfig:
+      rules:
+        - pattern: "kafka.server<type=BrokerTopicMetrics,name=MessagesInPerSec><>OneMinuteRate"
+          name: "kafka_server_broker_topic_messages_in_per_sec"
+        - pattern: "kafka.server<type=BrokerTopicMetrics,name=BytesInPerSec><>OneMinuteRate"
+          name: "kafka_server_broker_topic_bytes_in_per_sec"
+
+# Network policies
+networkPolicy:
+  enabled: true
+  ingressRules:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: "event-processor"
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: "billing-service"
+  egressRules:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: "zookeeper"
+
+# Pod Disruption Budget
+pdb:
+  enabled: true
+  minAvailable: 2  # Ensure high availability
+
+# Affinity rules
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: "app.kubernetes.io/name"
+              operator: "In"
+              values:
+                - "kafka"
+        topologyKey: "topology.kubernetes.io/zone"
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: "node.kubernetes.io/instance-type"
+              operator: "In"
+              values:
+                - "r6g.2xlarge"
