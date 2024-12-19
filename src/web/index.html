@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Character encoding and viewport configuration -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+    <!-- Primary meta tags -->
+    <title>OTPless Internal Billing System</title>
+    <meta name="description" content="Internal billing and invoicing platform for OTPless authentication services">
+    <meta name="theme-color" content="#1976D2">
+
+    <!-- Security headers -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://browser.sentry-cdn.com; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://api.otpless.com">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+
+    <!-- PWA support -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+    <!-- Open Graph / Social meta tags -->
+    <meta property="og:title" content="OTPless Internal Billing System">
+    <meta property="og:description" content="Internal billing and invoicing platform for OTPless authentication services">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+
+    <!-- Resource preconnect for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://api.otpless.com" crossorigin>
+
+    <!-- Fonts with performance optimization -->
+    <link 
+        rel="stylesheet" 
+        href="https://fonts.googleapis.com/icon?family=Material+Icons" 
+        media="print" 
+        onload="this.media='all'"
+        crossorigin="anonymous"
+    >
+    <link 
+        rel="stylesheet" 
+        href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" 
+        media="print" 
+        onload="this.media='all'"
+        crossorigin="anonymous"
+    >
+
+    <!-- Critical CSS preload -->
+    <link 
+        rel="preload" 
+        href="/src/assets/styles/global.css" 
+        as="style"
+    >
+    <link rel="stylesheet" href="/src/assets/styles/global.css">
+</head>
+<body>
+    <!-- Skip link for accessibility -->
+    <a href="#root" class="skip-link">Skip to main content</a>
+
+    <!-- Application root -->
+    <div 
+        id="root" 
+        role="application" 
+        aria-label="OTPless Internal Billing System"
+    ></div>
+
+    <!-- Fallback for no JavaScript -->
+    <noscript>
+        <div style="padding: 20px; text-align: center;">
+            <h1>JavaScript Required</h1>
+            <p>You need to enable JavaScript to run this application.</p>
+        </div>
+    </noscript>
+
+    <!-- Main application bundle -->
+    <script type="module" src="/src/main.tsx"></script>
+
+    <!-- Error tracking (production only) -->
+    <script 
+        src="https://browser.sentry-cdn.com/7.x/bundle.min.js" 
+        crossorigin="anonymous"
+        defer
+    ></script>
+
+    <!-- Service worker registration -->
+    <script>
+        if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+                    .then(registration => {
+                        console.log('ServiceWorker registered successfully');
+                    })
+                    .catch(error => {
+                        console.error('ServiceWorker registration failed:', error);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>
