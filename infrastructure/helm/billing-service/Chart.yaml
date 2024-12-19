@@ -1,0 +1,67 @@
+apiVersion: v2
+name: billing-service
+description: A production-grade Helm chart for OTPless Billing Service providing high-availability billing operations, real-time event processing, secure wallet management, and automated invoice generation with multi-tenant data isolation
+version: 1.0.0
+appVersion: 1.0.0
+type: application
+
+keywords:
+  - billing
+  - invoicing
+  - wallet
+  - otpless
+  - event-processing
+  - high-availability
+  - multi-tenant
+  - financial-services
+
+maintainers:
+  - name: OTPless Platform Team
+    email: platform-support@otpless.com
+    url: https://github.com/otpless/billing-service
+  - name: OTPless DevOps Team
+    email: devops@otpless.com
+    url: https://github.com/otpless/infrastructure
+
+# Dependencies required for high-availability billing operations
+dependencies:
+  - name: postgresql
+    version: "12.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+    tags:
+      - database
+      - persistence
+
+  - name: kafka
+    version: "22.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: kafka.enabled
+    tags:
+      - messaging
+      - events
+
+  - name: redis
+    version: "17.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+    tags:
+      - cache
+      - performance
+
+# Home URL for the chart
+home: https://github.com/otpless/billing-service
+
+# Sources for the chart
+sources:
+  - https://github.com/otpless/billing-service
+  - https://github.com/otpless/infrastructure
+
+# Additional annotations
+annotations:
+  category: Financial
+  licenses: Apache-2.0
+  support: https://otpless.com/support
+
+# Icon for the chart (optional)
+icon: https://otpless.com/icons/billing-service.png
