@@ -1,0 +1,194 @@
+{
+  "common": {
+    "actions": {
+      "add": "Add",
+      "edit": "Edit",
+      "delete": "Delete",
+      "save": "Save",
+      "cancel": "Cancel",
+      "confirm": "Confirm",
+      "back": "Back",
+      "next": "Next",
+      "search": "Search",
+      "filter": "Filter",
+      "export": "Export",
+      "import": "Import",
+      "refresh": "Refresh",
+      "download": "Download",
+      "upload": "Upload",
+      "print": "Print",
+      "close": "Close"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "pending": "Pending",
+      "completed": "Completed",
+      "failed": "Failed",
+      "processing": "Processing",
+      "suspended": "Suspended",
+      "expired": "Expired",
+      "onHold": "On Hold"
+    },
+    "validation": {
+      "required": "This field is required",
+      "email": "Invalid email address",
+      "phone": "Invalid phone number",
+      "minLength": "Must be at least {{min}} characters",
+      "maxLength": "Must be at most {{max}} characters",
+      "numeric": "Must be a number",
+      "positive": "Must be a positive number",
+      "date": "Invalid date format",
+      "currency": "Invalid currency amount",
+      "password": "Password must contain at least 8 characters, including uppercase, lowercase, numbers and special characters",
+      "match": "Fields do not match",
+      "url": "Invalid URL format"
+    },
+    "datetime": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "tomorrow": "Tomorrow",
+      "format": {
+        "short": "MM/DD/YYYY",
+        "long": "MMMM DD, YYYY",
+        "time": "HH:mm:ss",
+        "datetime": "MMMM DD, YYYY HH:mm:ss"
+      },
+      "months": {
+        "full": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+        "short": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+      },
+      "weekdays": {
+        "full": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+        "short": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+      }
+    },
+    "currency": {
+      "format": "{{symbol}}{{amount}}",
+      "decimal": ".",
+      "thousand": ",",
+      "precision": 2,
+      "symbols": {
+        "USD": "$",
+        "INR": "₹",
+        "IDR": "Rp"
+      }
+    },
+    "accessibility": {
+      "loading": "Loading content",
+      "error": "Error occurred",
+      "success": "Operation successful",
+      "warning": "Warning",
+      "info": "Information",
+      "navigation": "Main navigation",
+      "skipLink": "Skip to main content",
+      "menu": "Menu",
+      "closeMenu": "Close menu",
+      "expandSection": "Expand section",
+      "collapseSection": "Collapse section"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Login to OTPless Billing",
+      "email": "Email Address",
+      "password": "Password",
+      "submit": "Sign In",
+      "forgotPassword": "Forgot Password?",
+      "register": "Create New Account",
+      "rememberMe": "Remember Me",
+      "mfa": {
+        "title": "Two-Factor Authentication",
+        "code": "Enter Authentication Code",
+        "verify": "Verify Code",
+        "resend": "Resend Code",
+        "backup": "Use Backup Code"
+      }
+    },
+    "errors": {
+      "invalidCredentials": "Invalid email or password",
+      "accountLocked": "Account has been locked",
+      "sessionExpired": "Session has expired",
+      "unauthorized": "Unauthorized access"
+    }
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "overview": {
+      "revenue": {
+        "title": "Total Revenue",
+        "today": "Today's Revenue",
+        "mtd": "Month to Date",
+        "ytd": "Year to Date",
+        "growth": "{{percentage}}% {{direction}} from last period",
+        "ariaLabel": "Revenue overview chart"
+      },
+      "customers": {
+        "title": "Active Customers",
+        "new": "New Customers",
+        "churn": "Customer Churn",
+        "total": "Total Customers",
+        "ariaLabel": "Customer statistics"
+      },
+      "usage": {
+        "title": "Usage Overview",
+        "total": "Total Calls",
+        "success": "Successful Calls",
+        "failed": "Failed Calls",
+        "ariaLabel": "Usage statistics chart"
+      }
+    },
+    "alerts": {
+      "lowBalance": "Low wallet balance for {{customer}}",
+      "highUsage": "High usage detected for {{customer}}",
+      "paymentDue": "Payment due for invoice #{{invoice}}"
+    }
+  },
+  "billing": {
+    "invoice": {
+      "create": {
+        "title": "Create New Invoice",
+        "customer": "Select Customer",
+        "period": {
+          "start": "Billing Period Start",
+          "end": "Billing Period End"
+        },
+        "items": {
+          "service": "Service",
+          "usage": "Usage",
+          "rate": "Rate",
+          "amount": "Amount",
+          "addItem": "Add Line Item",
+          "removeItem": "Remove Item"
+        },
+        "summary": {
+          "subtotal": "Subtotal",
+          "tax": "Tax ({{rate}}%)",
+          "total": "Total Amount",
+          "ariaLabel": "Invoice summary"
+        }
+      },
+      "status": {
+        "draft": "Draft",
+        "pending": "Pending",
+        "paid": "Paid",
+        "overdue": "Overdue",
+        "void": "Void"
+      }
+    },
+    "wallet": {
+      "balance": "Current Balance",
+      "transactions": "Transaction History",
+      "topup": {
+        "title": "Top Up Wallet",
+        "amount": "Amount",
+        "method": "Payment Method",
+        "confirm": "Confirm Top Up"
+      },
+      "alerts": {
+        "lowBalance": "Low Balance Warning",
+        "threshold": "Balance Threshold: {{amount}}"
+      }
+    }
+  }
+}
