@@ -1,0 +1,83 @@
+# Event Processor ConfigMap
+# Version: 1.0.0
+# Purpose: Configuration for high-throughput event processing service
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: event-processor-config
+  namespace: otpless-system
+  labels:
+    app: event-processor
+    component: backend
+    part-of: billing-system
+    environment: production
+    managed-by: terraform
+  annotations:
+    description: "Configuration for event processor service handling usage events"
+    version: "1.0.0"
+    lastUpdated: "2024"
+data:
+  # Node.js Runtime Configuration
+  NODE_ENV: "production"
+  PORT: "3000"
+  LOG_LEVEL: "info"
+
+  # Kafka Configuration for 1000+ events/second throughput
+  KAFKA_BROKERS: "kafka-0.kafka-headless.otpless-system.svc.cluster.local:9092,kafka-1.kafka-headless.otpless-system.svc.cluster.local:9092,kafka-2.kafka-headless.otpless-system.svc.cluster.local:9092"
+  KAFKA_CLIENT_ID: "otpless-event-processor"
+  KAFKA_GROUP_ID: "event-processor-group"
+  KAFKA_TOPIC_USAGE_EVENTS: "usage-events"
+  KAFKA_TOPIC_DLQ: "usage-events-dlq"
+  KAFKA_CONSUMER_CONCURRENCY: "4"  # Parallel consumers for high throughput
+  KAFKA_BATCH_SIZE: "100"  # Optimized batch size for processing
+  KAFKA_AUTO_COMMIT_INTERVAL: "5000"  # 5 seconds
+  KAFKA_SESSION_TIMEOUT: "30000"  # 30 seconds
+  KAFKA_HEARTBEAT_INTERVAL: "10000"  # 10 seconds
+  KAFKA_MAX_BYTES_PER_PARTITION: "1048576"  # 1MB max fetch size
+  KAFKA_RETRY_MAX_ATTEMPTS: "3"
+  KAFKA_RETRY_INITIAL_DELAY: "1000"  # 1 second
+
+  # TimescaleDB Configuration for time-series event storage
+  DB_HOST: "timescaledb.otpless-system.svc.cluster.local"
+  DB_PORT: "5432"
+  DB_NAME: "otpless_events"
+  DB_USER: "event_processor"
+  DB_POOL_MIN: "5"  # Minimum pool connections
+  DB_POOL_MAX: "20"  # Maximum pool connections for high concurrency
+  DB_IDLE_TIMEOUT: "30000"  # 30 seconds idle timeout
+  DB_CONNECTION_TIMEOUT: "5000"  # 5 seconds connection timeout
+  DB_STATEMENT_TIMEOUT: "10000"  # 10 seconds query timeout
+  DB_SSL_MODE: "require"  # Enforce SSL for security
+  DB_APPLICATION_NAME: "event-processor"
+
+  # Metrics Configuration for Prometheus
+  METRICS_PORT: "9090"
+  METRICS_PATH: "/metrics"
+  METRICS_SCRAPE_INTERVAL: "15s"
+  METRICS_LABELS: |
+    {
+      "service": "event-processor",
+      "component": "backend",
+      "team": "billing"
+    }
+
+  # Health Check Configuration
+  HEALTH_CHECK_PORT: "8081"
+  HEALTH_CHECK_PATH: "/health"
+  HEALTH_CHECK_TIMEOUT: "5000"  # 5 seconds timeout
+
+  # Event Processing Configuration
+  EVENT_BATCH_TIMEOUT: "5000"  # 5 seconds max batch wait time
+  EVENT_PROCESSING_TIMEOUT: "30000"  # 30 seconds processing timeout
+  EVENT_RETENTION_DAYS: "90"  # 90 days event retention
+  EVENT_VALIDATION_SCHEMA: |
+    {
+      "type": "object",
+      "required": ["eventId", "customerId", "eventType", "timestamp"],
+      "properties": {
+        "eventId": { "type": "string", "format": "uuid" },
+        "customerId": { "type": "string" },
+        "eventType": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    }
