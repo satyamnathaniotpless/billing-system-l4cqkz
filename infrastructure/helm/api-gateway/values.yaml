@@ -1,0 +1,201 @@
+# Kong API Gateway Helm Values Configuration
+# Version: 3.0
+# Purpose: Production configuration for OTPless Internal Billing System API Gateway
+
+image:
+  repository: kong
+  tag: "3.0-alpine"
+  pullPolicy: IfNotPresent
+
+# High availability configuration
+replicaCount: 3
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# Resource allocation for production workload
+resources:
+  requests:
+    cpu: "500m"
+    memory: "512Mi"
+  limits:
+    cpu: "2"
+    memory: "2Gi"
+
+# Kong specific configuration
+kong:
+  env:
+    database: "off"
+    proxy_access_log: "/dev/stdout"
+    admin_access_log: "/dev/stdout"
+    proxy_error_log: "/dev/stderr"
+    admin_error_log: "/dev/stderr"
+    admin_listen: "0.0.0.0:8001"
+    proxy_stream_error_log: "/dev/stderr"
+    lua_ssl_trusted_certificate: "/etc/ssl/certs/ca-certificates.crt"
+    lua_ssl_verify_depth: "4"
+  
+  config:
+    plugins:
+      - bundled
+      - jwt
+      - cors
+      - rate-limiting
+      - prometheus
+      - ip-restriction
+      - request-transformer
+      - response-transformer
+      - acl
+      - key-auth
+      - oauth2
+      - basic-auth
+      - hmac-auth
+      - bot-detection
+      - proxy-cache
+      - request-size-limiting
+
+# Ingress controller configuration
+ingressController:
+  enabled: true
+  installCRDs: false
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+# Proxy configuration
+proxy:
+  http:
+    enabled: true
+    servicePort: 8000
+    containerPort: 8000
+  tls:
+    enabled: true
+    servicePort: 8443
+    containerPort: 8443
+    parameters:
+      - "TLSv1.2"
+      - "TLSv1.3"
+    cipherSuites:
+      - "ECDHE-ECDSA-AES128-GCM-SHA256"
+      - "ECDHE-RSA-AES128-GCM-SHA256"
+      - "ECDHE-ECDSA-AES256-GCM-SHA384"
+      - "ECDHE-RSA-AES256-GCM-SHA384"
+
+# Admin API configuration
+admin:
+  enabled: true
+  http:
+    enabled: true
+    servicePort: 8001
+    containerPort: 8001
+  tls:
+    enabled: true
+    servicePort: 8444
+    containerPort: 8444
+  ingress:
+    enabled: false
+
+# Metrics configuration
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: "15s"
+    scrapeTimeout: "14s"
+    labels:
+      release: prometheus
+
+# Security context
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  runAsNonRoot: true
+  readOnlyRootFilesystem: true
+
+podSecurityContext:
+  fsGroup: 1000
+
+# Pod annotations for monitoring and security
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8001"
+  prometheus.io/path: "/metrics"
+  vault.hashicorp.com/agent-inject: "true"
+  vault.hashicorp.com/role: "api-gateway"
+
+# Health checks
+livenessProbe:
+  httpGet:
+    path: /status
+    port: 8001
+    scheme: HTTP
+  initialDelaySeconds: 5
+  timeoutSeconds: 5
+  periodSeconds: 10
+  successThreshold: 1
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /status
+    port: 8001
+    scheme: HTTP
+  initialDelaySeconds: 5
+  timeoutSeconds: 5
+  periodSeconds: 10
+  successThreshold: 1
+  failureThreshold: 3
+
+# Pod scheduling rules
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app: api-gateway
+          topologyKey: kubernetes.io/hostname
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/role
+              operator: In
+              values:
+                - worker
+
+tolerations:
+  - key: "node-role.kubernetes.io/worker"
+    operator: "Exists"
+    effect: "NoSchedule"
+
+# Configuration files mounting
+configurationFiles:
+  kong.yml:
+    enabled: true
+    mountPath: /kong/config/kong.yml
+  rate-limiting.conf:
+    enabled: true
+    mountPath: /kong/config/rate-limiting.conf
+
+# High availability settings
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# Network policies
+networkPolicy:
+  enabled: true
+  ingressRules:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
