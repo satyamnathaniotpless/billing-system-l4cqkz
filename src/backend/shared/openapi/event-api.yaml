@@ -1,0 +1,291 @@
+openapi: 3.0.0
+info:
+  title: OTPless Event Processing API
+  version: 1.0.0
+  description: |
+    API for processing usage events in the OTPless billing system.
+    Handles high-volume event ingestion with rate limiting and validation.
+  contact:
+    name: OTPless Engineering Team
+    email: engineering@otpless.com
+  license:
+    name: Proprietary
+    
+servers:
+  - url: /api/v1
+    description: Production API server
+
+tags:
+  - name: Events
+    description: Event processing endpoints for usage tracking and billing
+
+paths:
+  /events:
+    post:
+      summary: Process single usage event
+      description: |
+        Processes a single usage event with validation and rate limiting.
+        Supports idempotent processing using event ID.
+      operationId: processEvent
+      tags:
+        - Events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Event'
+      responses:
+        '202':
+          description: Event accepted for processing
+          headers:
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+                example: 1200
+              description: Request limit per minute
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+              description: Remaining requests for the time window
+            X-Request-ID:
+              schema:
+                type: string
+                format: uuid
+              description: Request tracking ID
+        '400':
+          description: Invalid event data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Time to wait before retrying (seconds)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /events/batch:
+    post:
+      summary: Process multiple events in batch
+      description: |
+        Processes multiple events in a single request.
+        Limited to 100 events per batch for optimal processing.
+      operationId: processBatch
+      tags:
+        - Events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/Event'
+              maxItems: 100
+              description: Array of events to process
+      responses:
+        '202':
+          description: Batch accepted for processing
+          headers:
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-Request-ID:
+              schema:
+                type: string
+                format: uuid
+        '400':
+          description: Invalid batch data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /events/{accountId}:
+    get:
+      summary: Retrieve events for an account
+      description: |
+        Retrieves usage events for a specific account with pagination and filtering.
+      operationId: getEvents
+      tags:
+        - Events
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 64
+          description: Account identifier
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter events from this timestamp
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter events until this timestamp
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [SMS, WhatsApp, Email]
+          description: Filter by event type
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number for pagination
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Number of events per page
+      responses:
+        '200':
+          description: Events retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Event:
+      type: object
+      required:
+        - accountId
+        - type
+        - quantity
+        - timestamp
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique event identifier for idempotency
+        accountId:
+          type: string
+          maxLength: 64
+          description: Account identifier
+        type:
+          type: string
+          enum: [SMS, WhatsApp, Email]
+          description: Type of usage event
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 10000
+          description: Event quantity/count
+        timestamp:
+          type: string
+          format: date-time
+          description: Event occurrence time (ISO8601)
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Additional event metadata
+        auditInfo:
+          type: object
+          properties:
+            createdAt:
+              type: string
+              format: date-time
+            createdBy:
+              type: string
+            version:
+              type: string
+          description: Audit information for tracking
+        performance:
+          type: object
+          properties:
+            processingTime:
+              type: number
+            validationTime:
+              type: number
+          description: Performance metrics
+
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Error message
+        details:
+          type: object
+          description: Additional error details
+
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+          description: Total number of events
+        page:
+          type: integer
+          description: Current page number
+        limit:
+          type: integer
+          description: Events per page
+        pages:
+          type: integer
+          description: Total number of pages
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+
+security:
+  - ApiKeyAuth: []
