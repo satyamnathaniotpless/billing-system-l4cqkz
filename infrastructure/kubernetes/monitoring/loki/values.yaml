@@ -1,0 +1,175 @@
+# Loki Helm Chart Values v4.x
+# Purpose: Configures Loki log aggregation system for OTPless Internal Billing System
+
+# Global Loki configuration
+loki:
+  # High availability deployment
+  replicas: 2
+
+  # Container image configuration
+  image:
+    repository: grafana/loki
+    tag: "2.8.4"  # Specific version for stability
+    pullPolicy: IfNotPresent
+
+  # Persistent storage configuration
+  persistence:
+    enabled: true
+    size: 50Gi
+    storageClass: gp2  # AWS EBS storage class
+    annotations:
+      backup.velero.io/backup-volumes: storage
+      encryption.aws.com/ebs: "true"
+
+  # Resource allocation
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+
+  # Loki server configuration
+  config:
+    auth_enabled: true
+    
+    # Chunk store configuration
+    chunk_store_config:
+      max_look_back_period: 720h  # 30 days retention
+    
+    # Table manager for retention
+    table_manager:
+      retention_deletes_enabled: true
+      retention_period: 720h  # 30 days retention
+
+    # Compactor configuration
+    compactor:
+      working_directory: /data/loki/boltdb-shipper-compactor
+      shared_store: filesystem
+      retention_enabled: true
+      retention_delete_delay: 2h
+      compaction_interval: 10m
+
+    # Schema configuration
+    schema_config:
+      configs:
+        - from: "2023-01-01"
+          store: boltdb-shipper
+          object_store: filesystem
+          schema: v11
+          index:
+            prefix: index_
+            period: 24h
+
+    # Storage configuration
+    storage_config:
+      boltdb_shipper:
+        active_index_directory: /data/loki/boltdb-shipper-active
+        cache_location: /data/loki/boltdb-shipper-cache
+        cache_ttl: 24h
+        shared_store: filesystem
+      filesystem:
+        directory: /data/loki/chunks
+
+    # Query configuration
+    query_range:
+      align_queries_with_step: true
+      max_retries: 5
+      split_queries_by_interval: 30m
+      cache_results: true
+
+    # Limits configuration
+    limits_config:
+      enforce_metric_name: false
+      reject_old_samples: true
+      reject_old_samples_max_age: 168h  # 7 days
+      max_query_length: 721h  # 30 days + 1h buffer
+      max_query_parallelism: 32
+      ingestion_rate_mb: 10
+      ingestion_burst_size_mb: 20
+
+  # Security context
+  securityContext:
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+    runAsNonRoot: true
+
+# Promtail configuration for log collection
+promtail:
+  enabled: true
+  
+  config:
+    clients:
+      - url: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
+    
+    snippets:
+      scrapeConfigs:
+        # Kubernetes pods logs
+        - job_name: kubernetes-pods
+          kubernetes_sd_configs:
+            - role: pod
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_pod_label_app]
+              target_label: app
+            - source_labels: [__meta_kubernetes_namespace]
+              target_label: namespace
+            - source_labels: [__meta_kubernetes_pod_name]
+              target_label: pod
+            - source_labels: [__meta_kubernetes_container_name]
+              target_label: container
+            
+        # System logs with security focus
+        - job_name: security-audit-logs
+          kubernetes_sd_configs:
+            - role: pod
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_pod_label_security_audit]
+              regex: true
+              action: keep
+            - source_labels: [__meta_kubernetes_namespace]
+              target_label: namespace
+          pipeline_stages:
+            - json:
+                expressions:
+                  event_type: event
+                  user: user
+                  resource: resource
+            - labels:
+                event_type:
+                user:
+                resource:
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 3100
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "3100"
+
+# Ingress configuration - disabled as accessing through internal service
+ingress:
+  enabled: false
+
+# Monitoring configuration
+serviceMonitor:
+  enabled: true
+  namespace: monitoring
+  interval: 30s
+  scrapeTimeout: 25s
+  labels:
+    release: prometheus
+
+# Network policy
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: otpless-monitoring
+        - namespaceSelector:
+            matchLabels:
+              name: otpless-billing
