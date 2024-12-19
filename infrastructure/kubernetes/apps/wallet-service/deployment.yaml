@@ -1,0 +1,150 @@
+# Wallet Service Kubernetes Deployment Configuration v1.0
+# Purpose: Defines a highly available, secure, and resource-optimized deployment
+# for the Wallet Service with zero-downtime updates and strict security controls
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wallet-service
+  namespace: otpless
+  labels:
+    app: wallet-service
+    component: core-service
+    version: "1.0"
+  annotations:
+    # Deployment strategy annotations
+    kubernetes.io/change-cause: "Initial deployment of wallet service"
+    # Security annotations
+    container.seccomp.security.alpha.kubernetes.io/pod: runtime/default
+spec:
+  # High availability with 3 replicas as per 99.9% uptime requirement
+  replicas: 3
+  # Zero-downtime rolling updates
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: wallet-service
+  template:
+    metadata:
+      labels:
+        app: wallet-service
+      annotations:
+        # Prometheus metrics collection
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+        # Security profile
+        seccomp.security.alpha.kubernetes.io/pod: "runtime/default"
+    spec:
+      # Pod distribution and anti-affinity rules
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - wallet-service
+              topologyKey: "kubernetes.io/hostname"
+      # Ensure even pod distribution across zones
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: wallet-service
+      # Container specifications
+      containers:
+        - name: wallet-service
+          # Using golang:1.20-alpine as per container strategy
+          image: wallet-service:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          # Resource limits as per container strategy
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+          # Enhanced security context
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          # Health checks
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 30
+          # Mount configuration from ConfigMap
+          volumeMounts:
+            - name: config
+              mountPath: /etc/wallet-service
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          env:
+            - name: CONFIG_FILE
+              value: "/etc/wallet-service/config.yaml"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+      # Volume definitions
+      volumes:
+        - name: config
+          configMap:
+            name: wallet-service-config
+        - name: tmp
+          emptyDir: {}
+      # Service account for RBAC
+      serviceAccountName: wallet-service
+      # Security settings
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      # Termination grace period
+      terminationGracePeriodSeconds: 60
