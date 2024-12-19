@@ -1,0 +1,144 @@
+name: Infrastructure CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'infrastructure/terraform/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'infrastructure/terraform/**'
+  workflow_dispatch:
+
+# Ensure only one workflow runs at a time per ref
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write # Required for AWS OIDC auth
+  contents: read
+  pull-requests: write
+  security-events: write
+
+env:
+  TF_VERSION: '1.5.x'
+  AWS_REGION: 'ap-south-1'
+  TF_INPUT: '0'
+  TF_IN_AUTOMATION: 'true'
+
+jobs:
+  validate:
+    name: Validate Infrastructure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GithubActionsOIDC
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Initialize Terraform
+        working-directory: infrastructure/terraform/aws
+        run: |
+          terraform init -backend=false
+          
+      - name: Validate Terraform Configuration
+        working-directory: infrastructure/terraform/aws
+        run: |
+          terraform validate
+          terraform fmt -check -recursive
+
+      - name: Run tfsec Security Scan
+        uses: aquasecurity/tfsec-action@v1.0.0
+        with:
+          working_directory: infrastructure/terraform/aws
+          format: sarif
+          soft_fail: true
+
+      - name: Upload Security Results
+        uses: github/codeql-action/upload-sarif@v2
+        if: success() || failure()
+        with:
+          sarif_file: tfsec.sarif
+
+  plan:
+    name: Generate Plan
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GithubActionsOIDC
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Initialize Terraform
+        working-directory: infrastructure/terraform/aws
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=${{ secrets.TF_LOCK_TABLE }}"
+
+      - name: Generate Terraform Plan
+        working-directory: infrastructure/terraform/aws
+        run: |
+          terraform plan -detailed-exitcode -out=tfplan \
+            -var="environment=${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}" \
+            -var="project=otpless-billing" \
+            -var="aws_region=${{ env.AWS_REGION }}" \
+            -no-color 2>&1 | tee plan.txt
+
+      - name: Upload Plan Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform-plan
+          path: |
+            infrastructure/terraform/aws/tfplan
+            infrastructure/terraform/aws/plan.txt
+          retention-days: 5
+
+      - name: Comment Plan on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const planOutput = fs.readFileSync('infrastructure/terraform/aws/plan.txt', 'utf8');
+            const truncatedPlan = planOutput.length > 65000 
+              ? planOutput.substring(0, 65000) + '\n\n... Plan truncated ...'
+              : planOutput;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '### Terraform Plan Output\n```hcl\n' + truncatedPlan + '\n```'
+            });
