@@ -1,0 +1,45 @@
+# Wallet Service Kubernetes Service Configuration v1.0
+# Purpose: Defines service discovery and load balancing for the Wallet Service
+# Supports high availability with 99.9% uptime requirement and performance monitoring
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: wallet-service
+  namespace: otpless
+  labels:
+    app: wallet-service
+    component: service-endpoint
+    version: "1.0"
+  annotations:
+    # Service monitoring annotations
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+    # Service quality annotations
+    service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout: "60"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+spec:
+  # Using ClusterIP for internal service discovery
+  type: ClusterIP
+  # Port configuration aligned with wallet-service-config
+  ports:
+    # Main application port
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+    # Metrics port for monitoring (from wallet-service-config)
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+  # Pod selector using app label
+  selector:
+    app: wallet-service
+  # Session handling configuration
+  sessionAffinity: None
+  # Don't publish pods that aren't ready
+  publishNotReadyAddresses: false
+  # Internal traffic policy for improved routing
+  internalTrafficPolicy: Cluster
