@@ -1,0 +1,66 @@
+# Kubernetes Service manifest for OTPless Billing Service
+# Version: v1
+# Purpose: Exposes billing microservice endpoints within the cluster with load balancing and monitoring
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: billing-service
+  namespace: otpless-billing
+  labels:
+    app: billing-service
+    component: billing
+    version: v1
+    environment: production
+    tier: backend
+    managed-by: terraform
+  annotations:
+    # Prometheus monitoring configuration
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/actuator/prometheus"
+    prometheus.io/scrape-interval: "15s"
+    
+    # AWS Load Balancer configurations
+    service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    
+    # Service metadata
+    service.otpless.com/description: "Core billing service endpoints"
+    service.otpless.com/owner: "billing-team"
+    service.otpless.com/criticality: "high"
+    
+    # Health check configuration
+    service.otpless.com/health-check-path: "/actuator/health"
+    service.otpless.com/health-check-port: "8081"
+    
+    # Security annotations
+    security.otpless.com/encryption-in-transit: "required"
+    security.otpless.com/internal-only: "true"
+
+spec:
+  type: ClusterIP  # Internal-only service type for security
+  selector:
+    app: billing-service
+    component: billing
+  
+  ports:
+    # Main application port for billing operations
+    - name: http-api
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+      
+    # Management port for actuator endpoints
+    - name: http-mgmt
+      port: 8081
+      targetPort: 8081
+      protocol: TCP
+  
+  # Load balancing configuration
+  sessionAffinity: None  # Enable round-robin load balancing
+  publishNotReadyAddresses: false  # Only route traffic to ready pods
+  
+  # Internal traffic policy for improved security
+  internalTrafficPolicy: Cluster
