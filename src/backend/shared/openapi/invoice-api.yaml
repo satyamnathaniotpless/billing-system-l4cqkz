@@ -1,0 +1,501 @@
+openapi: 3.0.3
+info:
+  title: OTPless Internal Billing System - Invoice Service API
+  version: 1.0.0
+  description: |
+    REST API for invoice generation, management and tax calculations.
+    Supports multi-currency billing with GST/IGST tax handling.
+  contact:
+    name: OTPless Engineering Team
+    email: engineering@otpless.com
+
+servers:
+  - url: https://api.otpless.com/api/v1
+    description: Production server
+  - url: https://staging-api.otpless.com/api/v1
+    description: Staging server
+  - url: http://localhost:8000/api/v1
+    description: Development server
+
+security:
+  - BearerAuth: []
+
+paths:
+  /invoices:
+    post:
+      operationId: createInvoice
+      summary: Generate a new invoice
+      description: Creates a new invoice with tax calculations based on jurisdiction
+      tags:
+        - Invoices
+      security:
+        - BearerAuth: []
+      x-rateLimit:
+        limit: 100
+        period: minute
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceRequest'
+      responses:
+        '201':
+          description: Invoice created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    get:
+      operationId: listInvoices
+      summary: List invoices
+      description: Retrieve a paginated list of invoices with filtering options
+      tags:
+        - Invoices
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AccountId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/StartDate'
+        - $ref: '#/components/parameters/EndDate'
+        - $ref: '#/components/parameters/Status'
+        - $ref: '#/components/parameters/Currency'
+      responses:
+        '200':
+          description: List of invoices
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/InvoiceResponse'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationMetadata'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /invoices/{invoiceId}:
+    get:
+      operationId: getInvoice
+      summary: Get invoice by ID
+      description: Retrieve detailed invoice information including tax breakdown
+      tags:
+        - Invoices
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/InvoiceId'
+      responses:
+        '200':
+          description: Invoice details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /invoices/tax-preview:
+    post:
+      operationId: previewTaxCalculation
+      summary: Preview tax calculations
+      description: Calculate applicable taxes without generating an invoice
+      tags:
+        - Tax Calculations
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaxPreviewRequest'
+      responses:
+        '200':
+          description: Tax calculation preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaxPreviewResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  schemas:
+    InvoiceRequest:
+      type: object
+      required:
+        - account_id
+        - line_items
+        - currency
+        - tax_jurisdiction
+        - customer_details
+      properties:
+        account_id:
+          type: string
+          format: uuid
+          description: Customer account identifier
+        line_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineItem'
+          minItems: 1
+        currency:
+          type: string
+          enum: [USD, INR, IDR]
+          description: Invoice currency code
+        due_date:
+          type: string
+          format: date-time
+          description: Optional invoice due date
+        tax_jurisdiction:
+          type: string
+          enum: [IN-GST, IN-IGST]
+          description: Tax jurisdiction for calculations
+        customer_details:
+          $ref: '#/components/schemas/CustomerDetails'
+        notes:
+          type: string
+          maxLength: 1000
+          description: Optional invoice notes
+
+    LineItem:
+      type: object
+      required:
+        - service_name
+        - description
+        - quantity
+        - unit_price
+      properties:
+        service_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+        quantity:
+          type: integer
+          minimum: 1
+        unit_price:
+          type: number
+          format: decimal
+          minimum: 0
+          exclusiveMinimum: true
+        amount:
+          type: number
+          format: decimal
+          readOnly: true
+
+    CustomerDetails:
+      type: object
+      required:
+        - name
+        - address
+        - tax_id
+        - state
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        address:
+          type: string
+          minLength: 1
+          maxLength: 500
+        tax_id:
+          type: string
+          minLength: 1
+          maxLength: 50
+        state:
+          type: string
+          minLength: 1
+          maxLength: 100
+
+    InvoiceResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoice_number:
+          type: string
+        account_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [DRAFT, PENDING, PAID, OVERDUE, CANCELLED]
+        currency:
+          type: string
+          enum: [USD, INR, IDR]
+        subtotal:
+          type: number
+          format: decimal
+        tax_amount:
+          type: number
+          format: decimal
+        tax_breakdown:
+          $ref: '#/components/schemas/TaxBreakdown'
+        total_amount:
+          type: number
+          format: decimal
+        line_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineItem'
+        customer_details:
+          $ref: '#/components/schemas/CustomerDetails'
+        pdf_url:
+          type: string
+          format: uri
+        created_at:
+          type: string
+          format: date-time
+        due_date:
+          type: string
+          format: date-time
+
+    TaxPreviewRequest:
+      type: object
+      required:
+        - line_items
+        - tax_jurisdiction
+        - currency
+      properties:
+        line_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineItem'
+          minItems: 1
+        tax_jurisdiction:
+          type: string
+          enum: [IN-GST, IN-IGST]
+        currency:
+          type: string
+          enum: [USD, INR, IDR]
+
+    TaxPreviewResponse:
+      type: object
+      properties:
+        subtotal:
+          type: number
+          format: decimal
+        tax_breakdown:
+          $ref: '#/components/schemas/TaxBreakdown'
+        total_amount:
+          type: number
+          format: decimal
+        currency:
+          type: string
+          enum: [USD, INR, IDR]
+
+    TaxBreakdown:
+      type: object
+      properties:
+        tax_type:
+          type: string
+          enum: [GST, IGST]
+        rate:
+          type: number
+          format: decimal
+        components:
+          type: object
+          additionalProperties:
+            type: number
+            format: decimal
+        total:
+          type: number
+          format: decimal
+
+    PaginationMetadata:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        pages:
+          type: integer
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+
+  parameters:
+    InvoiceId:
+      name: invoiceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Invoice unique identifier
+
+    AccountId:
+      name: account_id
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+      description: Filter by account ID
+
+    Page:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number for pagination
+
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Number of items per page
+
+    StartDate:
+      name: start_date
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date-time
+      description: Filter by start date
+
+    EndDate:
+      name: end_date
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date-time
+      description: Filter by end date
+
+    Status:
+      name: status
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [DRAFT, PENDING, PAID, OVERDUE, CANCELLED]
+      description: Filter by invoice status
+
+    Currency:
+      name: currency
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [USD, INR, IDR]
+      description: Filter by currency
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Authentication required or invalid credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    TooManyRequests:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Time in seconds to wait before retrying
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for API authentication
+
+tags:
+  - name: Invoices
+    description: Invoice management endpoints
+  - name: Tax Calculations
+    description: Tax calculation and preview endpoints
