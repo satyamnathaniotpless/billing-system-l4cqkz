@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    /* Basic Options */
+    "target": "ES2022",                       // Target latest stable ECMAScript features
+    "module": "commonjs",                     // Use commonjs for Node.js compatibility
+    "lib": ["ES2022"],                        // Include latest ECMAScript features
+    "declaration": true,                      // Generate .d.ts files for TypeScript declarations
+    "sourceMap": true,                        // Generate source maps for debugging
+    "removeComments": true,                   // Remove comments in output files
+    
+    /* Strict Type Checking */
+    "strict": true,                          // Enable all strict type checking options
+    "noImplicitAny": true,                   // Raise error on expressions and declarations with implied 'any' type
+    "noImplicitThis": true,                  // Raise error on 'this' expressions with implied 'any' type
+    "noUnusedLocals": true,                  // Report errors on unused local variables
+    "noUnusedParameters": true,              // Report errors on unused parameters
+    "noImplicitReturns": true,               // Report error when not all code paths in function return a value
+    "noFallthroughCasesInSwitch": true,      // Report errors for fallthrough cases in switch statement
+    
+    /* Module Resolution */
+    "moduleResolution": "node",              // Use Node.js style module resolution
+    "esModuleInterop": true,                 // Enable interoperability between CommonJS and ES Modules
+    "experimentalDecorators": true,          // Enable experimental support for decorators
+    "emitDecoratorMetadata": true,           // Emit design-type metadata for decorated declarations
+    "skipLibCheck": true,                    // Skip type checking of declaration files
+    "forceConsistentCasingInFileNames": true,// Ensure consistent casing in file names
+    "resolveJsonModule": true,               // Allow importing JSON files as modules
+    "allowSyntheticDefaultImports": true,    // Allow default imports from modules with no default export
+    
+    /* Project References */
+    "baseUrl": ".",                          // Base directory for resolving non-relative module names
+    "paths": {
+      "*": ["node_modules/*"]                // Configure module path aliases
+    }
+  },
+  "exclude": [
+    "node_modules",                          // Exclude node_modules directory
+    "dist",                                  // Exclude build output directory
+    "**/*.test.ts",                          // Exclude test files
+    "**/*.spec.ts"                           // Exclude spec files
+  ]
+}
