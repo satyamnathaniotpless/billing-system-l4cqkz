@@ -1,0 +1,158 @@
+# Prometheus Helm Chart Values
+# Version: v2.45.x
+
+server:
+  replicas: 2  # High availability setup
+  
+  image:
+    repository: prom/prometheus
+    tag: v2.45.x
+    pullPolicy: IfNotPresent
+  
+  retention: 30d  # Data retention period
+  
+  persistentVolume:
+    enabled: true
+    size: 50Gi
+    storageClass: gp2  # AWS EBS storage class
+  
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  
+  securityContext:
+    runAsUser: 65534  # nobody user
+    runAsNonRoot: true
+    fsGroup: 65534
+
+alertmanager:
+  enabled: true
+  replicas: 2  # High availability setup
+  
+  persistentVolume:
+    enabled: true
+    size: 10Gi
+  
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ['job', 'severity']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      receiver: default
+      routes:
+        - match:
+            severity: critical
+          group_wait: 10s
+          repeat_interval: 1h
+        - match:
+            service: billing
+          group_wait: 15s
+          repeat_interval: 2h
+
+serviceMonitors:
+  api-gateway:
+    enabled: true
+    namespace: monitoring
+    endpoints:
+      - port: http
+        path: /metrics
+        interval: 15s
+        scrapeTimeout: 10s
+    selector:
+      matchLabels:
+        app: api-gateway
+
+  billing-service:
+    enabled: true
+    namespace: monitoring
+    endpoints:
+      - port: http
+        path: /actuator/prometheus
+        interval: 15s
+        scrapeTimeout: 10s
+        metricRelabelings:
+          - sourceLabels: ['__name__']
+            regex: spring_.*
+            action: keep
+    selector:
+      matchLabels:
+        app: billing-service
+
+  event-processor:
+    enabled: true
+    namespace: monitoring
+    endpoints:
+      - port: http
+        path: /metrics
+        interval: 15s
+        scrapeTimeout: 10s
+        metricRelabelings:
+          - sourceLabels: ['__name__']
+            regex: nodejs_.*|http_.*
+            action: keep
+    selector:
+      matchLabels:
+        app: event-processor
+
+  wallet-service:
+    enabled: true
+    namespace: monitoring
+    endpoints:
+      - port: http
+        path: /metrics
+        interval: 15s
+        scrapeTimeout: 10s
+    selector:
+      matchLabels:
+        app: wallet-service
+
+service:
+  type: ClusterIP
+  port: 9090
+
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+  hosts:
+    - prometheus.otpless-billing.internal
+  tls:
+    - secretName: prometheus-tls
+      hosts:
+        - prometheus.otpless-billing.internal
+
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+        - podSelector:
+            matchLabels:
+              app: grafana
+
+storage:
+  tsdb:
+    retention:
+      time: 30d
+      size: 45GB
+    wal:
+      retention:
+        time: 12h
+
+kubeStateMetrics:
+  enabled: true
+  metricLabelsAllowlist:
+    - nodes=[kubernetes.io/arch,kubernetes.io/os,kubernetes.io/hostname]
+    - pods=[app.kubernetes.io/name,app.kubernetes.io/instance]
