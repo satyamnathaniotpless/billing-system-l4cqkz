@@ -1,0 +1,45 @@
+apiVersion: v2
+name: api-gateway
+description: API Gateway for OTPless Internal Billing System based on Kong, providing secure routing, authentication, and monitoring capabilities
+version: 1.0.0
+appVersion: "3.4.0"
+type: application
+
+keywords:
+  - api-gateway
+  - kong
+  - otpless
+  - billing
+  - security
+  - monitoring
+
+maintainers:
+  - name: OTPless DevOps Team
+    email: devops@otpless.com
+
+dependencies:
+  - name: kong
+    version: 3.4.x
+    repository: https://charts.konghq.com
+    condition: kong.enabled
+    tags:
+      - gateway
+      - proxy
+      - load-balancer
+
+  - name: cert-manager
+    version: 1.12.x
+    repository: https://charts.jetstack.io
+    condition: certManager.enabled
+    tags:
+      - certificates
+      - tls
+      - security
+
+annotations:
+  artifacthub.io/changes: "Initial release of API Gateway chart with Kong 3.4.0 and security configurations"
+  artifacthub.io/containsSecurityUpdates: "true"
+  artifacthub.io/prerelease: "false"
+  artifacthub.io/license: "Apache-2.0"
+  artifacthub.io/maintainers: '[{"name":"OTPless DevOps Team","email":"devops@otpless.com"}]'
+  artifacthub.io/recommendations: '[{"url":"https://docs.konghq.com/kubernetes-ingress-controller/latest/"}]'
