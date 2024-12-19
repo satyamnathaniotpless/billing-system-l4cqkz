@@ -1,0 +1,449 @@
+openapi: 3.0.3
+info:
+  title: OTPless Wallet Service API
+  description: |
+    API specification for the OTPless Wallet Service providing wallet management operations
+    including balance tracking, transactions, and low balance alerts.
+  version: 1.0.0
+  contact:
+    name: OTPless Engineering Team
+    email: engineering@otpless.com
+
+servers:
+  - url: https://api.otpless.com/api/v1
+    description: Production server
+  - url: https://staging-api.otpless.com/api/v1
+    description: Staging server
+
+security:
+  - bearerAuth: []
+  - rateLimiting: []
+
+paths:
+  /wallets:
+    post:
+      summary: Create a new wallet
+      description: Creates a new wallet for a customer with initial configuration
+      operationId: createWallet
+      tags:
+        - Wallet Management
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWalletRequest'
+      responses:
+        '201':
+          description: Wallet created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+  /wallets/{id}:
+    get:
+      summary: Get wallet details
+      description: Retrieves detailed information about a specific wallet
+      operationId: getWallet
+      tags:
+        - Wallet Management
+      parameters:
+        - $ref: '#/components/parameters/WalletIdParam'
+      responses:
+        '200':
+          description: Wallet details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+  /wallets/{id}/credit:
+    post:
+      summary: Credit wallet balance
+      description: Adds funds to the specified wallet
+      operationId: creditWallet
+      tags:
+        - Transactions
+      parameters:
+        - $ref: '#/components/parameters/WalletIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionRequest'
+      responses:
+        '200':
+          description: Credit transaction completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+  /wallets/{id}/debit:
+    post:
+      summary: Debit wallet balance
+      description: Deducts funds from the specified wallet
+      operationId: debitWallet
+      tags:
+        - Transactions
+      parameters:
+        - $ref: '#/components/parameters/WalletIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionRequest'
+      responses:
+        '200':
+          description: Debit transaction completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+  /wallets/{id}/transactions:
+    get:
+      summary: Get wallet transactions
+      description: Retrieves transaction history for the specified wallet
+      operationId: getWalletTransactions
+      tags:
+        - Transactions
+      parameters:
+        - $ref: '#/components/parameters/WalletIdParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: type
+          in: query
+          description: Filter by transaction type
+          schema:
+            $ref: '#/components/schemas/TransactionType'
+        - name: status
+          in: query
+          description: Filter by transaction status
+          schema:
+            $ref: '#/components/schemas/TransactionStatus'
+      responses:
+        '200':
+          description: Transaction history retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionListResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+  /wallets/{id}/balance:
+    get:
+      summary: Get wallet balance
+      description: Retrieves current balance and status for the specified wallet
+      operationId: getWalletBalance
+      tags:
+        - Wallet Management
+      parameters:
+        - $ref: '#/components/parameters/WalletIdParam'
+      responses:
+        '200':
+          description: Balance retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+components:
+  schemas:
+    CreateWalletRequest:
+      type: object
+      required:
+        - customer_id
+        - currency
+      properties:
+        customer_id:
+          type: string
+          format: uuid
+          description: Unique identifier of the customer
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          description: ISO 4217 currency code
+        low_balance_threshold:
+          type: number
+          format: float
+          minimum: 0
+          description: Balance threshold for low balance alerts
+
+    WalletResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        customer_id:
+          type: string
+          format: uuid
+        balance:
+          type: number
+          format: float
+        currency:
+          type: string
+        low_balance_threshold:
+          type: number
+          format: float
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        is_low_balance:
+          type: boolean
+
+    TransactionRequest:
+      type: object
+      required:
+        - amount
+        - reference_id
+      properties:
+        amount:
+          type: number
+          format: float
+          minimum: 0.01
+        reference_id:
+          type: string
+          minLength: 8
+          maxLength: 64
+        description:
+          type: string
+          maxLength: 256
+
+    TransactionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        wallet_id:
+          type: string
+          format: uuid
+        type:
+          $ref: '#/components/schemas/TransactionType'
+        status:
+          $ref: '#/components/schemas/TransactionStatus'
+        amount:
+          type: number
+          format: float
+        currency:
+          type: string
+        reference_id:
+          type: string
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    TransactionType:
+      type: string
+      enum:
+        - CREDIT
+        - DEBIT
+        - REFUND
+
+    TransactionStatus:
+      type: string
+      enum:
+        - INITIATED
+        - PROCESSING
+        - COMPLETED
+        - FAILED
+        - REVERSED
+
+    TransactionListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransactionResponse'
+        pagination:
+          $ref: '#/components/schemas/PaginationMetadata'
+
+    BalanceResponse:
+      type: object
+      properties:
+        wallet_id:
+          type: string
+          format: uuid
+        balance:
+          type: number
+          format: float
+        currency:
+          type: string
+        is_low_balance:
+          type: boolean
+        last_updated:
+          type: string
+          format: date-time
+
+    PaginationMetadata:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        has_more:
+          type: boolean
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+  parameters:
+    WalletIdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Unique identifier of the wallet
+
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number for pagination
+
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+      description: Number of items per page
+
+  responses:
+    BadRequestError:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    UnauthorizedError:
+      description: Authentication failed or token expired
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFoundError:
+      description: Requested resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    ConflictError:
+      description: Resource conflict or already exists
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    ValidationError:
+      description: Business validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    RateLimitError:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token with RS256 signing
+
+    rateLimiting:
+      type: apiKey
+      name: X-API-Key
+      in: header
+      description: API key for rate limiting with quota tracking
+
+tags:
+  - name: Wallet Management
+    description: Endpoints for managing wallets and balances
+  - name: Transactions
+    description: Endpoints for wallet transactions and history
