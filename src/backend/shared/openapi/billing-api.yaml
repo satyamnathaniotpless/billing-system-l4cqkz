@@ -1,0 +1,423 @@
+openapi: 3.0.3
+info:
+  title: OTPless Internal Billing System API
+  description: |
+    Enterprise-grade REST API for the OTPless Internal Billing System.
+    Provides endpoints for bill generation, payment processing, price plan management,
+    and billing status updates with comprehensive security controls.
+  version: 1.0.0
+  contact:
+    name: OTPless Engineering Team
+    email: engineering@otpless.com
+  license:
+    name: Proprietary
+    
+servers:
+  - url: https://api.otpless.com/v1
+    description: Production server
+  - url: https://staging-api.otpless.com/v1
+    description: Staging server
+
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []
+
+paths:
+  /bills:
+    post:
+      summary: Generate a new bill
+      operationId: generateBill
+      tags: [Bills]
+      security:
+        - BearerAuth: []
+      x-rateLimit:
+        limit: 100
+        period: 60
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BillGenerationRequest'
+      responses:
+        '201':
+          description: Bill generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bill'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    
+    get:
+      summary: List bills with filtering
+      operationId: getBills
+      tags: [Bills]
+      security:
+        - BearerAuth: []
+      x-rateLimit:
+        limit: 300
+        period: 60
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+        - $ref: '#/components/parameters/DateFrom'
+        - $ref: '#/components/parameters/DateTo'
+        - $ref: '#/components/parameters/Status'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Bills retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Bill'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationMetadata'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /bills/{billId}:
+    parameters:
+      - $ref: '#/components/parameters/BillId'
+    get:
+      summary: Get bill details
+      operationId: getBill
+      tags: [Bills]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Bill details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bill'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    
+    patch:
+      summary: Update bill status
+      operationId: updateBillStatus
+      tags: [Bills]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BillStatusUpdate'
+      responses:
+        '200':
+          description: Bill status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bill'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /price-plans:
+    get:
+      summary: List price plans
+      operationId: getPricePlans
+      tags: [PricePlans]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Active'
+        - $ref: '#/components/parameters/Currency'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Price plans retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PricePlan'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationMetadata'
+    
+    post:
+      summary: Create new price plan
+      operationId: createPricePlan
+      tags: [PricePlans]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PricePlanCreation'
+      responses:
+        '201':
+          description: Price plan created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PricePlan'
+
+components:
+  schemas:
+    Bill:
+      type: object
+      required:
+        - id
+        - customerId
+        - accountId
+        - amount
+        - taxAmount
+        - totalAmount
+        - currency
+        - status
+        - billingPeriodStart
+        - billingPeriodEnd
+        - dueDate
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the bill
+        customerId:
+          type: string
+          description: Customer identifier
+        accountId:
+          type: string
+          description: Account identifier
+        amount:
+          type: number
+          format: decimal
+          minimum: 0
+          description: Base amount before tax
+        taxAmount:
+          type: number
+          format: decimal
+          minimum: 0
+          description: Tax amount
+        totalAmount:
+          type: number
+          format: decimal
+          minimum: 0
+          description: Total amount including tax
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          description: ISO 4217 currency code
+        status:
+          type: string
+          enum: [DRAFT, PENDING, PAID, OVERDUE, CANCELLED, VOID]
+        billingPeriodStart:
+          type: string
+          format: date-time
+        billingPeriodEnd:
+          type: string
+          format: date-time
+        dueDate:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PricePlan:
+      type: object
+      required:
+        - id
+        - name
+        - currency
+        - basePrice
+        - includedUsage
+        - perUnitPrice
+        - billingFrequency
+        - active
+        - validFrom
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 3
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+        basePrice:
+          type: number
+          format: decimal
+          minimum: 0
+        includedUsage:
+          type: integer
+          minimum: 0
+        perUnitPrice:
+          type: number
+          format: decimal
+          minimum: 0
+        billingFrequency:
+          type: string
+          enum: [MONTHLY, QUARTERLY, ANNUAL]
+        active:
+          type: boolean
+        validFrom:
+          type: string
+          format: date-time
+        validUntil:
+          type: string
+          format: date-time
+          nullable: true
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  parameters:
+    BillId:
+      name: billId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CustomerId:
+      name: customerId
+      in: query
+      schema:
+        type: string
+    DateFrom:
+      name: dateFrom
+      in: query
+      schema:
+        type: string
+        format: date-time
+    DateTo:
+      name: dateTo
+      in: query
+      schema:
+        type: string
+        format: date-time
+    Status:
+      name: status
+      in: query
+      schema:
+        type: string
+        enum: [DRAFT, PENDING, PAID, OVERDUE, CANCELLED, VOID]
+    Active:
+      name: active
+      in: query
+      schema:
+        type: boolean
+    Currency:
+      name: currency
+      in: query
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 3
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    TooManyRequests:
+      description: Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
