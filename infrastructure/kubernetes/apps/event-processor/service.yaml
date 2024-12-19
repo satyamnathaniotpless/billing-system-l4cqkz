@@ -1,0 +1,48 @@
+# Event Processor Service
+# Version: 1.0.0
+# Purpose: Exposes the event processor service for internal cluster communication
+# with support for high-throughput event processing and metrics collection
+apiVersion: v1
+kind: Service
+metadata:
+  name: event-processor
+  namespace: otpless-billing
+  labels:
+    app: event-processor
+    component: backend
+    part-of: billing-system
+    environment: production
+    managed-by: terraform
+  annotations:
+    description: "High-throughput event processing service for usage metering"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+    service.otpless.com/sla: "99.9"
+    service.otpless.com/owner: "billing-team"
+spec:
+  type: ClusterIP
+  # Port configuration aligned with deployment container ports
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+      protocol: TCP
+      # Main application port for event processing
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+      protocol: TCP
+      # Dedicated metrics port for Prometheus scraping
+  # Selector matches deployment pod labels
+  selector:
+    app: event-processor
+  # Session affinity for consistent routing
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800  # 3 hours
+  # Publishing not ready addresses for faster failover
+  publishNotReadyAddresses: false
+  # Internal traffic policy for improved routing
+  internalTrafficPolicy: Cluster
