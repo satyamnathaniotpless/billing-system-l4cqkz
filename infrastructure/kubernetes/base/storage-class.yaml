@@ -1,0 +1,69 @@
+# Kubernetes version: 1.27.x
+# AWS EBS CSI Driver version: 1.x
+
+# Default StorageClass for general workloads
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ebs-sc
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+  labels:
+    environment: production
+    app.kubernetes.io/part-of: otpless
+    app.kubernetes.io/managed-by: terraform
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/version: v1
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+parameters:
+  type: gp3
+  encrypted: "true"
+  fsType: ext4
+  iops: "3000"
+  throughput: "125"
+  kmsKeyId: ${aws_kms_key.ebs.arn}
+  csi.storage.k8s.io/fstype: ext4
+  availability-zones: "us-west-2a,us-west-2b,us-west-2c"
+reclaimPolicy: Delete
+mountOptions:
+  - noatime
+  - nodiratime
+  - discard
+
+---
+# Encrypted StorageClass for sensitive data workloads
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ebs-sc-encrypted
+  labels:
+    environment: production
+    app.kubernetes.io/part-of: otpless
+    app.kubernetes.io/managed-by: terraform
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/version: v1
+    security.otpless.io/data-classification: sensitive
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+parameters:
+  type: gp3
+  encrypted: "true"
+  fsType: ext4
+  iops: "16000"  # Enhanced IOPS for better performance
+  throughput: "1000"  # Enhanced throughput for sensitive workloads
+  kmsKeyId: ${aws_kms_key.ebs.arn}
+  csi.storage.k8s.io/fstype: ext4
+  availability-zones: "us-west-2a,us-west-2b,us-west-2c"
+  # Additional encryption parameters for sensitive data
+  csi.storage.k8s.io/node-stage-secret-name: ebs-encryption-key
+  csi.storage.k8s.io/node-stage-secret-namespace: otpless-system
+reclaimPolicy: Delete
+mountOptions:
+  - noatime
+  - nodiratime
+  - discard
+  - data=ordered
+  - barrier=1
