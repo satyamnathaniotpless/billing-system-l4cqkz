@@ -1,0 +1,24 @@
+# These owners will be the default owners for everything in
+# the repository unless a later match takes precedence
+*       @otpless/core-team
+
+# Backend service code ownership
+src/backend/*    @otpless/backend-team
+
+# Frontend/Web application code ownership
+src/web/*    @otpless/frontend-team
+
+# Infrastructure code ownership
+infrastructure/*    @otpless/devops-team
+
+# CI/CD workflow ownership
+.github/workflows/*    @otpless/devops-team
+
+# Database migrations require both backend and DBA review
+src/backend/shared/migrations/*    @otpless/backend-team @otpless/dba-team
+
+# Security-related code requires security team review
+src/backend/**/security*.{java,ts,go,py}    @otpless/security-team
+
+# Billing logic requires both backend and finance team review
+src/backend/**/billing*.{java,ts,go,py}    @otpless/backend-team @otpless/finance-team
