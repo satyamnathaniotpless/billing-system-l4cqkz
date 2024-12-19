@@ -1,0 +1,129 @@
+name: Frontend CI
+
+# Trigger workflow on push/PR to main and manual dispatch
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/web/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/web/**'
+  workflow_dispatch:
+
+# Set permissions boundary for security
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  pull-requests: write
+
+# Prevent concurrent runs of the same workflow
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate Frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: src/web
+
+    strategy:
+      fail-fast: true
+      matrix:
+        node-version: [18.x]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: src/web/package-lock.json
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        id: npm-cache
+        with:
+          path: |
+            ~/.npm
+            src/web/node_modules
+          key: npm-${{ runner.os }}-${{ hashFiles('src/web/package-lock.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.npm-cache.outputs.cache-hit != 'true'
+        run: npm ci
+        env:
+          CI: true
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Run ESLint
+        run: npm run lint
+        env:
+          CI: true
+
+      - name: Run TypeScript type checking
+        run: npm run type-check
+        env:
+          CI: true
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+        env:
+          CI: true
+          NODE_ENV: test
+
+      - name: Upload test coverage
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage
+          path: src/web/coverage
+          retention-days: 7
+
+      - name: Build application
+        run: npm run build
+        env:
+          CI: true
+          NODE_ENV: production
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build
+          path: src/web/dist
+          retention-days: 7
+
+      - name: Report Status
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const { sha } = context;
+            const workflow_name = 'Frontend CI';
+            
+            const status = {
+              owner,
+              repo,
+              context: workflow_name,
+              sha,
+              state: '${{ job.status }}' === 'success' ? 'success' : 'failure',
+              description: '${{ job.status }}' === 'success' 
+                ? 'All checks passed'
+                : 'Some checks failed',
+              target_url: `${process.env.GITHUB_SERVER_URL}/${owner}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`
+            };
+            
+            await github.rest.repos.createCommitStatus(status);
