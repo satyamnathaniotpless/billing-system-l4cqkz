@@ -1,0 +1,129 @@
+# Redis Helm Chart Values Configuration
+# Version: 7.x
+# This configuration sets up a highly available Redis cluster with replication and sentinel
+
+architecture:
+  # Use replication mode for high availability
+  mode: replication
+  replicas: 3
+  sentinel:
+    enabled: true
+    quorum: 2
+
+# Authentication and security configuration
+auth:
+  enabled: true
+  sentinel: true
+  password:
+    secretName: redis-credentials
+    secretKey: redis-password
+  # ACL rules for service-specific access
+  acl:
+    enabled: true
+    rules:
+      # Billing service access for cache:* keys
+      - "user billing-service +@all ~cache:* >billing-password"
+      # Wallet service access for wallet:* keys
+      - "user wallet-service +@all ~wallet:* >wallet-password"
+      # Event processor access for events:* keys
+      - "user event-processor +@all ~events:* >events-password"
+
+# Master node configuration
+master:
+  persistence:
+    enabled: true
+    storageClass: ebs-sc
+    size: 50Gi
+    reclaimPolicy: Retain
+  resources:
+    requests:
+      memory: 4Gi
+      cpu: "2"
+    limits:
+      memory: 6Gi
+      cpu: "4"
+  config:
+    # Memory management configuration
+    maxmemory: 5Gi
+    maxmemory-policy: volatile-ttl
+    # Persistence configuration
+    save:
+      - "900 1"    # Save if 1 key changed in 15 minutes
+      - "300 10"   # Save if 10 keys changed in 5 minutes
+      - "60 10000" # Save if 10000 keys changed in 1 minute
+    appendonly: "yes"
+    appendfsync: everysec
+
+# Replica nodes configuration
+replica:
+  replicaCount: 2
+  persistence:
+    enabled: true
+    storageClass: ebs-sc
+    size: 50Gi
+  resources:
+    requests:
+      memory: 4Gi
+      cpu: "2"
+    limits:
+      memory: 6Gi
+      cpu: "4"
+
+# Sentinel configuration for high availability
+sentinel:
+  enabled: true
+  quorum: 2
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
+      cpu: 200m
+  configuration:
+    down-after-milliseconds: 5000
+    failover-timeout: 60000
+    parallel-syncs: 1
+
+# Prometheus metrics exporter configuration
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: "15s"
+    scrapeTimeout: "10s"
+    namespace: monitoring
+  resources:
+    requests:
+      memory: 128Mi
+      cpu: 100m
+    limits:
+      memory: 256Mi
+      cpu: 200m
+
+# Network policies for service access control
+networkPolicy:
+  enabled: true
+  ingressRules:
+    # Allow access from billing service
+    - from: billing-service
+      namespaceSelector: app=billing
+      ports: [6379, 26379]
+    # Allow access from wallet service
+    - from: wallet-service
+      namespaceSelector: app=wallet
+      ports: [6379, 26379]
+    # Allow access from event processor
+    - from: event-processor
+      namespaceSelector: app=events
+      ports: [6379, 26379]
+
+# Persistence configuration
+persistence:
+  enabled: true
+  storageClass: ebs-sc
+  size: 50Gi
+  backup:
+    enabled: true
+    schedule: "0 0 * * *"  # Daily backups at midnight
+    retention: "720h"      # 30-day retention
