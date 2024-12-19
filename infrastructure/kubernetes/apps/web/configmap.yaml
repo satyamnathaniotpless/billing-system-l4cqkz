@@ -1,0 +1,147 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-config
+  namespace: otpless-billing
+  labels:
+    app: web
+    component: frontend
+    environment: production
+data:
+  # Environment Variables Configuration
+  .env.production: |
+    # Application Configuration
+    VITE_MODE=production
+    VITE_APP_NAME=OTPless Billing
+    VITE_APP_VERSION=1.0.0
+    VITE_API_BASE_URL=https://api.billing.otpless.com
+    VITE_API_TIMEOUT=30000
+    VITE_DEFAULT_LOCALE=en
+    VITE_DEFAULT_CURRENCY=USD
+
+    # Authentication Configuration
+    VITE_AUTH_DOMAIN=auth.otpless.com
+    VITE_AUTH_AUDIENCE=https://api.billing.otpless.com
+
+    # Feature Flags
+    VITE_ENABLE_ANALYTICS=true
+    VITE_ENABLE_ERROR_TRACKING=true
+    VITE_ENABLE_MONITORING=true
+
+    # Wallet Configuration
+    VITE_LOW_BALANCE_THRESHOLD=1000
+    VITE_MIN_TOPUP_AMOUNT=100
+    VITE_MAX_TOPUP_AMOUNT=100000
+
+    # API Configuration
+    VITE_API_RATE_LIMIT=100
+    VITE_API_BURST_LIMIT=200
+
+  # NGINX Configuration
+  nginx.conf: |
+    worker_processes auto;
+    worker_rlimit_nofile 65535;
+
+    events {
+      worker_connections 2048;
+      multi_accept on;
+      use epoll;
+    }
+
+    http {
+      # Basic Settings
+      charset utf-8;
+      sendfile on;
+      tcp_nopush on;
+      tcp_nodelay on;
+      server_tokens off;
+      types_hash_max_size 2048;
+      client_max_body_size 1m;
+
+      # MIME Types
+      include /etc/nginx/mime.types;
+      default_type application/octet-stream;
+
+      # Logging
+      log_format detailed '$remote_addr - $remote_user [$time_local] '
+                         '"$request" $status $body_bytes_sent '
+                         '"$http_referer" "$http_user_agent" '
+                         '$request_time $upstream_response_time';
+      
+      access_log /var/log/nginx/access.log detailed buffer=512k flush=1m;
+      error_log /var/log/nginx/error.log warn;
+
+      # Compression
+      gzip on;
+      gzip_vary on;
+      gzip_proxied any;
+      gzip_comp_level 6;
+      gzip_min_length 1000;
+      gzip_types 
+        text/plain
+        text/css
+        application/json
+        application/javascript
+        text/xml
+        text/javascript
+        application/xml+rss;
+
+      # Rate Limiting
+      limit_req_zone $binary_remote_addr zone=api_limit:10m rate=100r/s;
+      limit_conn_zone $binary_remote_addr zone=addr_limit:10m;
+
+      # Main Server Block
+      server {
+        listen 80 http2;
+        server_name _;
+        root /usr/share/nginx/html;
+        index index.html;
+
+        # SPA Root Location
+        location / {
+          try_files $uri $uri/ /index.html;
+          expires -1;
+
+          # Security Headers
+          add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate" always;
+          add_header Pragma "no-cache" always;
+          add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+          add_header X-Frame-Options "DENY" always;
+          add_header X-Content-Type-Options "nosniff" always;
+          add_header X-XSS-Protection "1; mode=block" always;
+          add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+          add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.billing.otpless.com https://auth.otpless.com" always;
+          add_header Feature-Policy "camera 'none'; microphone 'none'; geolocation 'none'" always;
+          add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        }
+
+        # Static Assets
+        location /static/ {
+          expires 1y;
+          add_header Cache-Control "public, no-transform, immutable";
+          add_header Vary "Accept-Encoding";
+          access_log off;
+        }
+
+        # Assets
+        location /assets/ {
+          expires 1y;
+          add_header Cache-Control "public, no-transform, immutable";
+          add_header Vary "Accept-Encoding";
+          access_log off;
+        }
+
+        # Health Check
+        location /health {
+          access_log off;
+          add_header Content-Type application/json;
+          return 200 '{"status":"healthy"}';
+        }
+
+        # Metrics
+        location /metrics {
+          stub_status on;
+          access_log off;
+        }
+      }
+    }
