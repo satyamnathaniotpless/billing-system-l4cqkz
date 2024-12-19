@@ -1,0 +1,139 @@
+# Default values for OTPless Event Processor service
+# Base image: node:18-alpine
+
+# Global naming configuration
+nameOverride: ""
+fullnameOverride: ""
+namespace: billing
+
+# Deployment configuration
+replicaCount: 3
+
+# Container image configuration
+image:
+  repository: otpless/event-processor
+  tag: latest
+  pullPolicy: Always
+
+# Service configuration for internal access
+service:
+  type: ClusterIP
+  ports:
+    http: 3000
+    metrics: 9090
+
+# Resource allocation based on container strategy
+# CPU: 2 cores, Memory: 4Gi as per technical spec
+resources:
+  requests:
+    cpu: "1"
+    memory: "2Gi"
+  limits:
+    cpu: "2"
+    memory: "4Gi"
+
+# Kafka configuration for event streaming
+kafka:
+  brokers:
+    - kafka-0.kafka-headless.billing:9092
+  clientId: otpless-event-processor
+  groupId: event-processor-group
+  topics:
+    usageEvents: usage-events
+    dlq: usage-events-dlq
+
+# TimescaleDB configuration for event storage
+database:
+  host: timescaledb.billing
+  port: 5432
+  name: otpless_events
+  pool:
+    max: 20
+    idleTimeout: 30000
+    connectionTimeout: 5000
+
+# Prometheus monitoring configuration
+monitoring:
+  enabled: true
+  path: /metrics
+
+# Health check probe configuration
+probes:
+  liveness:
+    path: /health
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readiness:
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 10
+
+# Security context for container runtime
+podSecurityContext:
+  runAsUser: 1000
+  runAsNonRoot: true
+  fsGroup: 1000
+
+# High availability pod scheduling rules
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - event-processor
+          topologyKey: kubernetes.io/hostname
+
+# Pod disruption budget for availability
+podDisruptionBudget:
+  minAvailable: 2
+
+# Horizontal pod autoscaling configuration
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Node selector for pod scheduling
+nodeSelector: {}
+
+# Pod tolerations
+tolerations: []
+
+# Additional pod annotations
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9090"
+  prometheus.io/path: "/metrics"
+
+# Environment-specific configurations
+env:
+  NODE_ENV: production
+  LOG_LEVEL: info
+  EVENT_BATCH_SIZE: "100"
+  EVENT_PROCESSING_TIMEOUT: "5000"
+  METRICS_ENABLED: "true"
+
+# Service account configuration
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Network policy configuration
+networkPolicy:
+  enabled: true
+  ingressRules:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+        - podSelector:
+            matchLabels:
+              app: api-gateway
