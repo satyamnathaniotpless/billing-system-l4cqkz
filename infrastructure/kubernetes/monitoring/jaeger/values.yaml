@@ -1,0 +1,198 @@
+# Jaeger Helm Chart Values
+# Version: 1.45.0
+
+# Disable all-in-one deployment as we're using production components
+allInOne:
+  enabled: false
+
+# Collector configuration
+collector:
+  enabled: true
+  replicaCount: 2
+  
+  image:
+    repository: jaegertracing/jaeger-collector
+    tag: "1.45.0"
+    pullPolicy: IfNotPresent
+  
+  resources:
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+  
+  service:
+    type: ClusterIP
+    ports:
+      - name: jaeger-collector-grpc
+        port: 14250
+        targetPort: 14250
+        protocol: TCP
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+  
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  
+  securityContext:
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+
+# Query service configuration
+query:
+  enabled: true
+  replicaCount: 2
+  
+  image:
+    repository: jaegertracing/jaeger-query
+    tag: "1.45.0"
+    pullPolicy: IfNotPresent
+  
+  resources:
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+  
+  service:
+    type: ClusterIP
+    port: 16686
+  
+  ingress:
+    enabled: true
+    annotations:
+      kubernetes.io/ingress.class: nginx
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+    hosts:
+      - jaeger.otpless-billing.internal
+    tls:
+      - secretName: jaeger-tls
+        hosts:
+          - jaeger.otpless-billing.internal
+  
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  
+  securityContext:
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+
+# Agent configuration
+agent:
+  enabled: true
+  
+  image:
+    repository: jaegertracing/jaeger-agent
+    tag: "1.45.0"
+    pullPolicy: IfNotPresent
+  
+  resources:
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+  
+  daemonset:
+    enabled: true
+    useHostPort: false
+  
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  
+  securityContext:
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+
+# Storage configuration
+storage:
+  type: elasticsearch
+  elasticsearch:
+    host: elasticsearch-master.monitoring.svc.cluster.local
+    port: 9200
+    scheme: http
+    user: ${ELASTICSEARCH_USER}
+    password: ${ELASTICSEARCH_PASSWORD}
+    indexPrefix: jaeger
+    indexShards: 5
+    indexReplicas: 1
+    timeout: 30s
+    ilm:
+      enabled: true
+      rollover: 7d
+      policies:
+        hot:
+          minAge: "0ms"
+          rollover:
+            maxAge: "7d"
+        warm:
+          minAge: "7d"
+          delete:
+            minAge: "30d"
+
+# Security context for the entire deployment
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  runAsNonRoot: true
+
+# Sampling configuration
+sampling:
+  default:
+    type: probabilistic
+    param: 0.1
+  perOperation:
+    billing-service:
+      type: probabilistic
+      param: 1.0
+    wallet-service:
+      type: probabilistic
+      param: 1.0
+
+# Health check configuration
+healthCheck:
+  enabled: true
+  port: 14269
+
+# Metrics configuration
+metrics:
+  enabled: true
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "14269"
+
+# Dependencies configuration
+dependencies:
+  enabled: true
+  elasticsearch:
+    enabled: true
+    nameOverride: jaeger-elasticsearch
+  grafana:
+    enabled: false
