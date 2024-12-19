@@ -1,0 +1,198 @@
+# Kubernetes API version v1.27.x
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: otpless
+  labels:
+    app: web
+    component: frontend
+    environment: production
+    managed-by: kubernetes
+  annotations:
+    description: "OTPless Internal Billing System Web Frontend"
+spec:
+  # High availability configuration with 3 replicas
+  replicas: 3
+  # Zero-downtime rolling update strategy
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+        component: frontend
+      annotations:
+        # Prometheus monitoring integration
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "80"
+        prometheus.io/path: "/metrics"
+        # Config checksum for automatic pod updates on config changes
+        checksum/config: "${CONFIG_CHECKSUM}"
+    spec:
+      # Pod-level security context
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        runAsNonRoot: true
+      
+      # High availability pod distribution
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - web
+              topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node-type
+                operator: In
+                values:
+                - frontend
+      
+      # Pod topology spread constraints for zone distribution
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfied: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: web
+      
+      containers:
+      - name: web
+        image: otpless/web:latest
+        imagePullPolicy: Always
+        
+        # Container security context
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        
+        # Container ports
+        ports:
+        - containerPort: 80
+          protocol: TCP
+          name: http
+        
+        # Resource limits and requests
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 30
+        
+        # Environment configuration
+        envFrom:
+        - configMapRef:
+            name: web-config
+        
+        # Volume mounts for temporary storage
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        
+      # Volumes definition
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      
+      # Pod termination grace period
+      terminationGracePeriodSeconds: 60
+      
+      # Service account for pod
+      serviceAccountName: web-service-account
+      
+      # Image pull secrets if using private registry
+      imagePullSecrets:
+      - name: registry-credentials
+
+---
+# Horizontal Pod Autoscaler for web deployment
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: web-hpa
+  namespace: otpless
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: web
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 300
