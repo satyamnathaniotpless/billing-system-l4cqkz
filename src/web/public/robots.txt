@@ -1,0 +1,40 @@
+# OTPless Internal Billing System Crawler Access Control
+# Version: 1.0
+# Last Updated: 2023
+# Purpose: Implement security controls for web crawler access
+
+# Global rules for all crawlers
+User-agent: *
+
+# Protect sensitive billing system routes
+Disallow: /api/
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /billing/
+Disallow: /customer/
+Disallow: /wallet/
+Disallow: /reports/
+Disallow: /settings/
+Disallow: /invoices/
+Disallow: /transactions/
+
+# Allow access to public content
+Allow: /
+Allow: /public/
+Allow: /docs/
+Allow: /static/
+
+# Implement rate limiting for crawlers
+Crawl-delay: 10
+
+# Sitemap location for allowed content
+Sitemap: https://billing.otpless.com/sitemap.xml
+
+# Additional security headers are implemented via web server configuration
+# - X-Robots-Tag
+# - Rate limiting rules
+# - WAF configuration
+# - Access logging
+
+# Note: This file is complemented by additional security controls
+# Please refer to security documentation for complete protection measures
