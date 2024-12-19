@@ -1,0 +1,64 @@
+{
+  "name": "@otpless/backend",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "event-processor",
+    "invoice-service",
+    "wallet-service",
+    "billing-service"
+  ],
+  "scripts": {
+    "build": "lerna run build",
+    "test": "lerna run test",
+    "test:coverage": "lerna run test:coverage",
+    "lint": "lerna run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json}\"",
+    "clean": "lerna run clean",
+    "start:dev": "docker-compose up",
+    "start:prod": "lerna run start:prod",
+    "deploy": "lerna run deploy",
+    "typecheck": "lerna run typecheck",
+    "prepare": "husky install",
+    "security-audit": "npm audit && lerna run security-audit",
+    "docker:build": "docker-compose build",
+    "docker:clean": "docker-compose down -v"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.3",
+    "@types/node": "^18.17.1",
+    "@typescript-eslint/eslint-plugin": "^6.2.1",
+    "@typescript-eslint/parser": "^6.2.1",
+    "docker-compose": "^0.24.0",
+    "eslint": "^8.46.0",
+    "husky": "^8.0.3",
+    "jest": "^29.6.2",
+    "lerna": "^7.1.4",
+    "prettier": "^3.0.0",
+    "rimraf": "^5.0.1",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "helmet": "^7.0.0",
+    "ioredis": "^5.3.2",
+    "joi": "^17.9.2",
+    "kafkajs": "^2.2.4",
+    "lru-cache": "^10.0.0",
+    "pg": "^8.11.0",
+    "pino": "^8.15.0",
+    "pino-http": "^8.5.0",
+    "prom-client": "^14.2.0",
+    "rate-limiter-flexible": "^2.4.1",
+    "supertest": "^6.3.3",
+    "validator": "^13.11.0",
+    "winston": "^3.10.0",
+    "zod": "^3.22.0"
+  }
+}
