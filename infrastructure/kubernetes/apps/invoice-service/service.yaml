@@ -1,0 +1,61 @@
+# Kubernetes v1.27.x
+# Purpose: Service definition for invoice service with enhanced security and monitoring
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: invoice-service
+  namespace: otpless-billing
+  labels:
+    app: invoice-service
+    component: backend
+    version: v1
+    part-of: billing-system
+    environment: production
+    team: otpless-devops
+    managed-by: kubernetes
+  annotations:
+    # Monitoring configuration
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"
+    prometheus.io/path: "/metrics"
+    
+    # AWS load balancer configuration for internal access only
+    service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
+    
+    # Service metadata
+    description: "Invoice service for automated billing and PDF generation"
+    maintainer: "otpless-devops"
+    contact: "devops@otpless.com"
+    
+    # Security annotations
+    security.otpless.com/compliance-level: "high"
+    security.otpless.com/network-policy: "restricted"
+
+spec:
+  # Using ClusterIP for internal service discovery and security
+  type: ClusterIP
+  
+  # Port configuration for the service
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+  
+  # Selector matching deployment pods
+  selector:
+    app: invoice-service
+  
+  # Session configuration
+  sessionAffinity: None
+  publishNotReadyAddresses: false
+  
+  # Internal traffic policy for improved security
+  internalTrafficPolicy: Cluster
+  
+  # IP configuration
+  ipFamilyPolicy: SingleStack
+  ipFamilies:
+    - IPv4
