@@ -1,0 +1,56 @@
+# Helm API version - using v2 for Helm 3.x compatibility
+apiVersion: v2
+
+# Chart name - must be lowercase and hyphenated
+name: otpless-web
+
+# Chart version following semantic versioning
+version: 1.0.0
+
+# Application version that matches container image tag
+appVersion: "1.0.0"
+
+# Detailed chart description
+description: A Helm chart for deploying the OTPless Internal Billing System web frontend with high availability and scalability. Provides production-grade deployment configuration for React-based admin and customer portals with MUI v5 components.
+
+# Chart type - application for standalone deployments
+type: application
+
+# Search keywords for chart discovery
+keywords:
+  - otpless
+  - billing
+  - web
+  - frontend
+  - react
+  - mui
+  - kubernetes
+  - admin-portal
+  - customer-portal
+
+# Chart maintainers and contact information
+maintainers:
+  - name: OTPless Engineering Team
+    email: engineering@otpless.com
+    url: https://github.com/otpless
+
+# Home URL for the project
+home: https://github.com/otpless/billing-system
+
+# Additional annotations
+annotations:
+  category: Application
+  licenses: Apache-2.0
+  support: https://otpless.com/support
+
+# Dependencies - none required for frontend application
+dependencies: []
+
+# Icon URL for the chart
+icon: https://otpless.com/logo.png
+
+# Engine constraints
+engine: ^3.0.0
+
+# Kubernetes version requirements
+kubeVersion: ">=1.19.0-0"
