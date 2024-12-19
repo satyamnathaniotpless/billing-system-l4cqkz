@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: otpless
+  labels:
+    app: api-gateway
+    component: gateway
+    tier: frontend
+    managed-by: terraform
+  annotations:
+    # Prometheus monitoring configuration
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8001"
+    prometheus.io/path: "/metrics"
+    
+    # AWS Load Balancer configurations
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "${SSL_CERT_ARN}"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443,8444"
+    service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout: "60"
+    
+    # Health check configurations
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "HTTP"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/health"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "8000"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval: "10"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-timeout: "5"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-healthy-threshold: "2"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-unhealthy-threshold: "3"
+
+spec:
+  type: LoadBalancer
+  # Port configurations for different traffic types
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: 8443
+      protocol: TCP
+    - name: admin
+      port: 8001
+      targetPort: 8001
+      protocol: TCP
+    - name: admin-ssl
+      port: 8444
+      targetPort: 8444
+      protocol: TCP
+
+  # Selector matching deployment labels
+  selector:
+    app: api-gateway
+
+  # Session affinity configuration for consistent routing
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+
+  # Traffic policy for improved latency
+  externalTrafficPolicy: Local
+
+  # Security: restrict source ranges to private networks
+  loadBalancerSourceRanges:
+    - "10.0.0.0/8"     # Private network range
+    - "172.16.0.0/12"  # Private network range
+    - "192.168.0.0/16" # Private network range
