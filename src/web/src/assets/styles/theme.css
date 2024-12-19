@@ -1,0 +1,184 @@
+/* OTPless Internal Billing System Theme
+ * Version: 1.0.0
+ * Description: Core theme file defining design tokens and variables
+ * Based on Material Design 3.0 principles with 8px grid system
+ */
+
+/* Root theme variables - Light mode defaults */
+:root {
+  /* Color scheme */
+  color-scheme: light;
+
+  /* Primary colors */
+  --color-primary: #1976D2;
+  --color-primary-light: #90CAF9;
+  --color-primary-dark: #0D47A1;
+
+  /* Status colors */
+  --color-error: #F44336;
+  --color-error-light: #EF5350;
+  --color-warning: #FFC107;
+  --color-warning-light: #FFCA28;
+  --color-success: #4CAF50;
+  --color-success-light: #66BB6A;
+
+  /* Surface colors */
+  --color-background: #FFFFFF;
+  --color-surface: #F5F5F5;
+  --color-surface-variant: #EEEEEE;
+
+  /* Text colors */
+  --color-text-primary: #333333;
+  --color-text-secondary: #666666;
+  --color-text-disabled: #999999;
+  --color-border: #E0E0E0;
+
+  /* Typography */
+  --font-family-primary: Inter, system-ui, -apple-system, sans-serif;
+  --font-family-mono: 'JetBrains Mono', monospace;
+
+  /* Font sizes - 8px grid aligned */
+  --font-size-xs: 0.75rem;    /* 12px */
+  --font-size-sm: 0.875rem;   /* 14px */
+  --font-size-md: 1rem;       /* 16px */
+  --font-size-lg: 1.125rem;   /* 18px */
+  --font-size-xl: 1.25rem;    /* 20px */
+  --font-size-2xl: 1.5rem;    /* 24px */
+  --font-size-3xl: 1.875rem;  /* 30px */
+  --font-size-4xl: 2.25rem;   /* 36px */
+
+  /* Line heights */
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* Letter spacing */
+  --letter-spacing-tight: -0.025em;
+  --letter-spacing-normal: 0;
+  --letter-spacing-wide: 0.025em;
+
+  /* Spacing - 8px grid system */
+  --spacing-unit: 8px;
+  --spacing-xs: calc(var(--spacing-unit) * 0.5);  /* 4px */
+  --spacing-sm: var(--spacing-unit);              /* 8px */
+  --spacing-md: calc(var(--spacing-unit) * 2);    /* 16px */
+  --spacing-lg: calc(var(--spacing-unit) * 3);    /* 24px */
+  --spacing-xl: calc(var(--spacing-unit) * 4);    /* 32px */
+  --spacing-2xl: calc(var(--spacing-unit) * 6);   /* 48px */
+  --spacing-3xl: calc(var(--spacing-unit) * 8);   /* 64px */
+
+  /* Layout */
+  --container-sm: 640px;
+  --container-md: 768px;
+  --container-lg: 1024px;
+  --container-xl: 1280px;
+
+  /* Border radius */
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --border-radius-xl: 16px;
+
+  /* Animation */
+  --transition-duration-fast: 150ms;
+  --transition-duration-normal: 300ms;
+  --transition-duration-slow: 500ms;
+  --transition-timing: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Dark theme overrides */
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* Color overrides for dark theme */
+  --color-primary: #90CAF9;
+  --color-primary-light: #1976D2;
+  --color-primary-dark: #0D47A1;
+  
+  --color-error: #EF5350;
+  --color-error-light: #F44336;
+  --color-warning: #FFCA28;
+  --color-warning-light: #FFC107;
+  --color-success: #66BB6A;
+  --color-success-light: #4CAF50;
+
+  --color-background: #121212;
+  --color-surface: #1E1E1E;
+  --color-surface-variant: #2C2C2C;
+  
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #AAAAAA;
+  --color-text-disabled: #666666;
+  --color-border: #333333;
+}
+
+/* Theme transition utilities */
+.theme-transition-all {
+  transition: all var(--transition-duration-normal) var(--transition-timing);
+}
+
+.theme-transition-colors {
+  transition: 
+    background-color var(--transition-duration-normal) var(--transition-timing),
+    color var(--transition-duration-normal) var(--transition-timing),
+    border-color var(--transition-duration-normal) var(--transition-timing);
+}
+
+.theme-transition-transform {
+  transition: transform var(--transition-duration-normal) var(--transition-timing);
+}
+
+/* Color utilities */
+.text-primary { color: var(--color-text-primary); }
+.text-secondary { color: var(--color-text-secondary); }
+.text-disabled { color: var(--color-text-disabled); }
+.bg-primary { background-color: var(--color-primary); }
+.bg-surface { background-color: var(--color-surface); }
+.bg-surface-variant { background-color: var(--color-surface-variant); }
+.border-color { border-color: var(--color-border); }
+
+/* Elevation system */
+.elevation-0 {
+  box-shadow: none;
+}
+
+.elevation-1 {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+}
+
+.elevation-2 {
+  box-shadow: 0 3px 6px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.12);
+}
+
+.elevation-3 {
+  box-shadow: 0 10px 20px rgba(0,0,0,0.15), 0 3px 6px rgba(0,0,0,0.10);
+}
+
+/* Dark mode elevation adjustments */
+[data-theme='dark'] .elevation-1 {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.24), 0 1px 2px rgba(0,0,0,0.48);
+}
+
+[data-theme='dark'] .elevation-2 {
+  box-shadow: 0 3px 6px rgba(0,0,0,0.30), 0 2px 4px rgba(0,0,0,0.24);
+}
+
+[data-theme='dark'] .elevation-3 {
+  box-shadow: 0 10px 20px rgba(0,0,0,0.30), 0 3px 6px rgba(0,0,0,0.20);
+}
+
+/* System preference handling */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+  }
+}
+
+/* Accessibility - Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
