@@ -1,0 +1,120 @@
+{
+  "common": {
+    "actions": {
+      "add": "जोड़ें",
+      "edit": "संपादित करें",
+      "delete": "हटाएं",
+      "save": "सहेजें",
+      "cancel": "रद्द करें",
+      "confirm": "पुष्टि करें",
+      "back": "वापस",
+      "next": "अगला",
+      "search": "खोजें",
+      "filter": "फ़िल्टर",
+      "export": "निर्यात",
+      "import": "आयात",
+      "refresh": "रीफ्रेश करें",
+      "download": "डाउनलोड करें",
+      "upload": "अपलोड करें",
+      "print": "प्रिंट करें"
+    },
+    "status": {
+      "active": "सक्रिय",
+      "inactive": "निष्क्रिय",
+      "pending": "लंबित",
+      "completed": "पूर्ण",
+      "failed": "विफल",
+      "processing": "प्रसंस्करण",
+      "onHold": "होल्ड पर",
+      "cancelled": "रद्द किया गया",
+      "refunded": "वापसी की गई",
+      "partiallyRefunded": "आंशिक वापसी"
+    },
+    "validation": {
+      "required": "यह फ़ील्ड आवश्यक है",
+      "email": "अमान्य ईमेल पता",
+      "phone": "अमान्य फ़ोन नंबर",
+      "minLength": "कम से कम {{min}} अक्षर होने चाहिए",
+      "maxLength": "अधिकतम {{max}} अक्षर होने चाहिए",
+      "numeric": "एक संख्या होनी चाहिए",
+      "positive": "एक सकारात्मक संख्या होनी चाहिए",
+      "date": "अमान्य दिनांक",
+      "currency": "अमान्य राशि",
+      "gstin": "अमान्य GSTIN",
+      "pan": "अमान्य PAN नंबर",
+      "pincode": "अमान्य पिन कोड"
+    },
+    "dateTime": {
+      "today": "आज",
+      "yesterday": "कल",
+      "tomorrow": "कल",
+      "lastWeek": "पिछला सप्ताह",
+      "lastMonth": "पिछला महीना",
+      "lastYear": "पिछला वर्ष",
+      "format": {
+        "short": "DD/MM/YYYY",
+        "long": "D MMMM YYYY",
+        "time": "HH:mm",
+        "dateTime": "D MMMM YYYY HH:mm"
+      }
+    },
+    "currency": {
+      "format": {
+        "INR": "₹{{amount}}",
+        "USD": "${{amount}}",
+        "EUR": "€{{amount}}"
+      },
+      "separator": {
+        "decimal": ".",
+        "thousands": ","
+      }
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "लॉगिन",
+      "email": "ईमेल",
+      "password": "पासवर्ड",
+      "submit": "साइन इन करें",
+      "forgotPassword": "पासवर्ड भूल गए?",
+      "register": "खाता बनाएं",
+      "rememberMe": "मुझे याद रखें",
+      "twoFactor": "दो-कारक प्रमाणीकरण",
+      "verificationCode": "सत्यापन कोड"
+    }
+  },
+  "dashboard": {
+    "title": "डैशबोर्ड",
+    "overview": {
+      "revenue": {
+        "total": "कुल राजस्व",
+        "monthly": "मासिक राजस्व",
+        "growth": "वृद्धि दर",
+        "forecast": "पूर्वानुमान"
+      },
+      "usage": {
+        "total": "कुल उपयोग",
+        "peak": "पीक उपयोग",
+        "average": "औसत उपयोग"
+      }
+    }
+  },
+  "billing": {
+    "invoice": {
+      "generation": {
+        "title": "चालान जनरेशन",
+        "preview": "पूर्वावलोकन",
+        "confirm": "पुष्टि करें",
+        "success": "चालान सफलतापूर्वक जनरेट किया गया"
+      },
+      "details": {
+        "number": "चालान संख्या",
+        "date": "चालान दिनांक",
+        "dueDate": "भुगतान तिथि",
+        "amount": "राशि",
+        "tax": "कर",
+        "total": "कुल राशि"
+      }
+    }
+  }
+}
