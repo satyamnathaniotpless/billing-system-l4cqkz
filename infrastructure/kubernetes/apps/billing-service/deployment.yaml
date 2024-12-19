@@ -1,0 +1,181 @@
+# Kubernetes Deployment manifest for OTPless Billing Service
+# Version: apps/v1
+# Purpose: Defines the deployment configuration for the core billing microservice
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: billing-service
+  namespace: otpless-billing
+  labels:
+    app: billing-service
+    component: billing
+    version: v1
+    environment: production
+    tier: backend
+    managed-by: terraform
+  annotations:
+    description: "Core billing service deployment"
+    maintainer: "billing-team@otpless.com"
+    security.otpless.com/compliance-level: "high"
+    deployment.kubernetes.io/revision: "1"
+
+spec:
+  # High availability configuration with 3 replicas
+  replicas: 3
+  
+  # Zero-downtime deployment strategy
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  
+  # Pod selector configuration
+  selector:
+    matchLabels:
+      app: billing-service
+      component: billing
+  
+  template:
+    metadata:
+      labels:
+        app: billing-service
+        component: billing
+        version: v1
+        environment: production
+      annotations:
+        # Prometheus monitoring configuration
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/actuator/prometheus"
+        # Config checksum for automatic pod updates on config changes
+        checksum/config: "${CONFIG_CHECKSUM}"
+        # Security annotations
+        security.otpless.com/encryption-in-transit: "required"
+        security.otpless.com/secure-logs: "enabled"
+    
+    spec:
+      # High availability configuration
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: billing-service
+              topologyKey: topology.kubernetes.io/zone
+      
+      # Ensure even pod distribution across zones
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: billing-service
+      
+      # Service account for pod identity
+      serviceAccountName: billing-service
+      
+      # Container configuration
+      containers:
+      - name: billing-service
+        image: otpless/billing-service:v1
+        imagePullPolicy: Always
+        
+        # Port configuration aligned with service
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: management
+          containerPort: 8081
+          protocol: TCP
+        
+        # Resource allocation for performance requirements
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+        
+        # Environment configuration
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "production"
+        - name: JAVA_OPTS
+          value: "-XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+UseStringDeduplication -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/dumps -Xms2g -Xmx3g"
+        
+        # Configuration and storage mounts
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: heap-dumps
+          mountPath: /dumps
+        - name: tmp-volume
+          mountPath: /tmp
+        
+        # Health check configuration
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8081
+          initialDelaySeconds: 60
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        startupProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          failureThreshold: 30
+        
+        # Security context for container
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      
+      # Volume definitions
+      volumes:
+      - name: config-volume
+        configMap:
+          name: billing-service-config
+      - name: heap-dumps
+        emptyDir: {}
+      - name: tmp-volume
+        emptyDir: {}
+      
+      # Pod security context
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: "OnRootMismatch"
+      
+      # Pod termination configuration
+      terminationGracePeriodSeconds: 60
+      
+      # Image pull configuration
+      imagePullSecrets:
+      - name: registry-credentials
