@@ -1,0 +1,216 @@
+# Kubernetes v1.27.x
+# Purpose: Defines production namespaces for OTPless Internal Billing System with strict isolation and security controls
+
+---
+# System namespace for core components
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: otpless-system
+  labels:
+    name: otpless-system
+    environment: production
+    team: otpless-devops
+    component: core
+    managed-by: terraform
+  annotations:
+    maintainer: "otpless-devops"
+    contact: "devops@otpless.com"
+    description: "Core system components namespace"
+    monitoring.otpless.com/enabled: "true"
+    security.otpless.com/compliance-level: "high"
+spec:
+  finalizers:
+    - kubernetes
+
+---
+# Billing services namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: otpless-billing
+  labels:
+    name: otpless-billing
+    environment: production
+    team: otpless-devops
+    component: billing
+    managed-by: terraform
+  annotations:
+    maintainer: "otpless-devops"
+    contact: "devops@otpless.com"
+    description: "Billing services and components namespace"
+    monitoring.otpless.com/enabled: "true"
+    security.otpless.com/compliance-level: "high"
+    backup.otpless.com/retention: "30d"
+    encryption.otpless.com/enabled: "true"
+spec:
+  finalizers:
+    - kubernetes
+
+---
+# Monitoring namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: otpless-monitoring
+  labels:
+    name: otpless-monitoring
+    environment: production
+    team: otpless-devops
+    component: monitoring
+    managed-by: terraform
+  annotations:
+    maintainer: "otpless-devops"
+    contact: "devops@otpless.com"
+    description: "Monitoring and observability components namespace"
+    monitoring.otpless.com/enabled: "true"
+    security.otpless.com/compliance-level: "medium"
+    retention.otpless.com/metrics: "15d"
+    retention.otpless.com/logs: "30d"
+spec:
+  finalizers:
+    - kubernetes
+
+---
+# Resource Quotas for system namespace
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: otpless-system-quota
+  namespace: otpless-system
+spec:
+  hard:
+    requests.cpu: "8"
+    requests.memory: "16Gi"
+    limits.cpu: "16"
+    limits.memory: "32Gi"
+    requests.storage: "100Gi"
+    pods: "50"
+    services: "20"
+    secrets: "50"
+    configmaps: "50"
+
+---
+# Resource Quotas for billing namespace
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: otpless-billing-quota
+  namespace: otpless-billing
+spec:
+  hard:
+    requests.cpu: "16"
+    requests.memory: "32Gi"
+    limits.cpu: "32"
+    limits.memory: "64Gi"
+    requests.storage: "500Gi"
+    pods: "100"
+    services: "30"
+    secrets: "100"
+    configmaps: "100"
+
+---
+# Resource Quotas for monitoring namespace
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: otpless-monitoring-quota
+  namespace: otpless-monitoring
+spec:
+  hard:
+    requests.cpu: "8"
+    requests.memory: "16Gi"
+    limits.cpu: "16"
+    limits.memory: "32Gi"
+    requests.storage: "200Gi"
+    pods: "30"
+    services: "10"
+    secrets: "30"
+    configmaps: "50"
+
+---
+# Default Network Policy for system namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-system
+  namespace: otpless-system
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: otpless-monitoring
+        - namespaceSelector:
+            matchLabels:
+              name: otpless-billing
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: otpless-monitoring
+        - namespaceSelector:
+            matchLabels:
+              name: otpless-billing
+
+---
+# Default Network Policy for billing namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-billing
+  namespace: otpless-billing
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: otpless-system
+        - namespaceSelector:
+            matchLabels:
+              name: otpless-monitoring
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: otpless-system
+        - namespaceSelector:
+            matchLabels:
+              name: otpless-monitoring
+
+---
+# Default Network Policy for monitoring namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-monitoring
+  namespace: otpless-monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: otpless-system
+        - namespaceSelector:
+            matchLabels:
+              name: otpless-billing
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: otpless-system
+        - namespaceSelector:
+            matchLabels:
+              name: otpless-billing
