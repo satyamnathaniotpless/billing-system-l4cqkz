@@ -1,0 +1,164 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-config
+  namespace: otpless-billing
+  labels:
+    app: api-gateway
+    component: config
+    environment: production
+  annotations:
+    checksum/kong-config: "${sha256sum kong.yml}"
+    checksum/rate-limiting: "${sha256sum rate-limiting.conf}"
+    checksum/security: "${sha256sum security-headers.conf}"
+    kubernetes.io/description: "API Gateway configuration for OTPless Internal Billing System"
+
+data:
+  # Kong Gateway Configuration
+  kong.yml: |
+    _format_version: "3.0"
+    _transform: true
+
+    services:
+      - name: billing_service
+        url: http://billing-service:8080
+        protocol: http
+        connect_timeout: 60000
+        read_timeout: 60000
+        write_timeout: 60000
+        retries: 5
+        tags: ["billing", "core"]
+        pool_size: 1000
+        keepalive_timeout: 60
+        
+        healthchecks:
+          active:
+            healthy:
+              interval: 5
+              successes: 2
+              http_statuses: [200, 201, 202]
+            unhealthy:
+              interval: 5
+              http_failures: 2
+              timeouts: 3
+              http_statuses: [429, 500, 502, 503, 504]
+
+      - name: event_service
+        url: http://event-processor:3000
+        protocol: http
+        connect_timeout: 30000
+        read_timeout: 30000
+        write_timeout: 30000
+        retries: 3
+        tags: ["events", "high-throughput"]
+        pool_size: 2000
+        keepalive_timeout: 30
+
+    plugins:
+      - name: cors
+        config:
+          origins: ["https://*.otpless.com"]
+          methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+          headers: ["Authorization", "Content-Type", "X-API-Key", "X-Request-ID"]
+          exposed_headers: ["X-RateLimit-Limit", "X-RateLimit-Remaining"]
+          credentials: true
+          max_age: 3600
+
+      - name: jwt
+        config:
+          key_claim_name: "kid"
+          claims_to_verify: ["exp", "nbf", "iss", "sub"]
+          maximum_expiration: 3600
+          secret_is_base64: true
+          validate_token_exp: true
+
+      - name: rate-limiting
+        config:
+          second: 100
+          minute: 1000
+          hour: 50000
+          policy: "redis"
+          fault_tolerant: true
+          redis_host: "redis"
+          redis_port: 6379
+          redis_timeout: 2000
+
+  # Rate Limiting Configuration
+  rate-limiting.conf: |
+    limit_req_zone $binary_remote_addr zone=ip_rate:20m rate=1000r/m sync;
+    limit_req_zone $http_x_api_key zone=apikey_rate:50m rate=10000r/m sync;
+    limit_req_zone $http_x_api_key$uri zone=endpoint_rate:100m rate=variable sync;
+
+    limit_req_status 429;
+    limit_req_log_level error;
+
+    map $request_uri $endpoint_limit {
+        default                     "1000r/m";
+        "~^/api/events"            "1000r/m";
+        "~^/api/billing"           "10000r/m";
+        "~^/api/invoices"          "5000r/m";
+        "~^/api/wallet"            "8000r/m";
+    }
+
+    location /api/events {
+        limit_req zone=ip_rate burst=200 nodelay;
+        limit_req zone=apikey_rate burst=200 nodelay;
+        limit_req zone=endpoint_rate burst=200 nodelay;
+        add_header X-RateLimit-Policy "1000 requests per minute" always;
+    }
+
+  # Security Headers Configuration
+  security-headers.conf: |
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Content-Security-Policy "default-src 'self'; \
+        script-src 'self' 'unsafe-inline'; \
+        connect-src 'self' api.otpless.com; \
+        worker-src 'none'; \
+        object-src 'none';" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+
+  # NGINX Core Configuration
+  nginx.conf: |
+    user nginx;
+    worker_processes auto;
+    worker_rlimit_nofile 65535;
+
+    events {
+        worker_connections 2048;
+        multi_accept on;
+        use epoll;
+    }
+
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/json;
+
+        # Optimization
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 65;
+        keepalive_requests 100;
+
+        # SSL Configuration
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_prefer_server_ciphers on;
+        ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256;
+        ssl_session_cache shared:SSL:10m;
+        ssl_session_timeout 10m;
+
+        # Logging
+        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                       '$status $body_bytes_sent "$http_referer" '
+                       '"$http_user_agent" "$http_x_forwarded_for"';
+        
+        access_log /var/log/nginx/access.log main buffer=16k;
+        error_log /var/log/nginx/error.log warn;
+
+        # Include additional configurations
+        include /etc/nginx/conf.d/*.conf;
+    }
