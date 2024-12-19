@@ -1,0 +1,207 @@
+# Default values for otpless-web Helm chart
+# This is a YAML-formatted file.
+
+# Image configuration
+image:
+  repository: otpless/web
+  # Use semantic versioning from Chart.yaml
+  tag: "1.0.0"
+  pullPolicy: Always
+
+# Image pull secrets for private registry access
+imagePullSecrets:
+  - name: registry-credentials
+
+# Override chart name if needed
+nameOverride: ""
+fullnameOverride: ""
+
+# Service account configuration for AWS IAM roles
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::123456789:role/web-service-role"
+  name: ""
+
+# Pod annotations for monitoring, logging, and secrets management
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "80"
+  prometheus.io/path: "/metrics"
+  fluentbit.io/parser: "nginx"
+  vault.hashicorp.com/agent-inject: "true"
+  vault.hashicorp.com/role: "web"
+
+# Pod security context for non-root user execution
+podSecurityContext:
+  fsGroup: 1000
+  fsGroupChangePolicy: "OnRootMismatch"
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  seccompProfile:
+    type: "RuntimeDefault"
+
+# Container security context
+securityContext:
+  capabilities:
+    drop:
+      - "ALL"
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  allowPrivilegeEscalation: false
+
+# Service configuration for internal access
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 80
+  protocol: TCP
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+
+# Ingress configuration for external access
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "1m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    external-dns.alpha.kubernetes.io/hostname: "billing.otpless.com"
+    external-dns.alpha.kubernetes.io/ttl: "60"
+  hosts:
+    - host: billing.otpless.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: web-tls
+      hosts:
+        - billing.otpless.com
+
+# Resource limits and requests
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+    ephemeral-storage: 1Gi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+    ephemeral-storage: 512Mi
+
+# Horizontal pod autoscaling configuration
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+
+# Node selection and tolerations
+nodeSelector:
+  kubernetes.io/os: linux
+  node.kubernetes.io/purpose: app
+
+tolerations:
+  - key: "node-role.kubernetes.io/app"
+    operator: "Exists"
+    effect: "NoSchedule"
+
+# Pod anti-affinity for high availability
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+                - web
+        topologyKey: kubernetes.io/hostname
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - web
+          topologyKey: topology.kubernetes.io/zone
+
+# Environment variables for the web application
+env:
+  VITE_MODE: "production"
+  VITE_APP_NAME: "OTPless Billing"
+  VITE_APP_VERSION: "1.0.0"
+  VITE_API_BASE_URL: "https://api.billing.otpless.com"
+  VITE_API_TIMEOUT: "30000"
+  VITE_DEFAULT_LOCALE: "en"
+  VITE_DEFAULT_CURRENCY: "USD"
+  VITE_ENABLE_ANALYTICS: "true"
+  VITE_LOW_BALANCE_THRESHOLD: "1000"
+  VITE_MIN_TOPUP_AMOUNT: "100"
+  VITE_MAX_TOPUP_AMOUNT: "100000"
+  VITE_ENABLE_CACHE: "true"
+  VITE_CACHE_TTL: "300"
+  VITE_MAX_RETRIES: "3"
+  VITE_RETRY_DELAY: "1000"
+
+# Health check probes
+livenessProbe:
+  httpGet:
+    path: /health/live
+    port: 80
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  successThreshold: 1
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health/ready
+    port: 80
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  successThreshold: 1
+  failureThreshold: 3
+
+startupProbe:
+  httpGet:
+    path: /health/startup
+    port: 80
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  successThreshold: 1
+  failureThreshold: 30
