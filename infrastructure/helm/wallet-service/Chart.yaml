@@ -1,0 +1,53 @@
+apiVersion: v2
+name: wallet-service
+description: A Helm chart for OTPless Wallet Service providing real-time wallet management with high availability, automated scaling, and comprehensive monitoring capabilities
+type: application
+version: 1.0.0
+appVersion: 1.0.0
+
+# Keywords for chart discovery and categorization
+keywords:
+  - wallet
+  - payment
+  - otpless
+  - billing
+  - high-availability
+  - scalable
+  - kubernetes
+
+# Chart maintainers
+maintainers:
+  - name: OTPless Team
+    email: support@otpless.com
+
+# Kubernetes version compatibility
+kubeVersion: ">=1.21.0"
+
+# Chart rendering engine
+engine: gotpl
+
+# Dependencies required by the wallet service
+dependencies:
+  # Metrics server for HPA and custom metrics
+  - name: metrics-server
+    version: 6.4.1
+    repository: https://kubernetes-sigs.github.io/metrics-server/
+    condition: metrics-server.enabled
+    tags:
+      - monitoring
+
+  # Redis for distributed caching and locking
+  - name: redis
+    version: 17.11.3
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+    tags:
+      - cache
+
+  # PostgreSQL for persistent wallet data storage
+  - name: postgresql
+    version: 12.5.8
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+    tags:
+      - database
