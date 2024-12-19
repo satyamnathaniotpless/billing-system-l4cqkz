@@ -1,0 +1,227 @@
+name: Backend CI
+
+# Trigger configuration with concurrency control
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/backend/**'
+      - '.github/workflows/backend-ci.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/backend/**'
+      - '.github/workflows/backend-ci.yml'
+  workflow_dispatch:
+
+# Concurrency control to prevent redundant runs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Security permissions
+permissions:
+  contents: read
+  packages: read
+  checks: write
+  security-events: write
+
+# Global environment variables
+env:
+  JAVA_VERSION: '17'
+  NODE_VERSION: '18.x'
+  PYTHON_VERSION: '3.11'
+  GO_VERSION: '1.20'
+  COVERAGE_THRESHOLD: '80'
+  REGISTRY: ghcr.io
+  CACHE_TTL: '7 days'
+
+jobs:
+  # Initial setup and dependency check
+  setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Security scan dependencies
+        uses: aquasecurity/trivy-action@v0.11.2
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload security scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Java Billing Service Build & Test
+  billing-service:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: 'maven'
+      
+      - name: Build and test
+        working-directory: src/backend/billing-service
+        run: |
+          mvn -B verify \
+            -Dspring.profiles.active=test \
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }}
+      
+      - name: Check test coverage
+        run: |
+          COVERAGE=$(cat target/site/jacoco/index.html | grep -o 'Total[^%]*' | awk '{print $2}')
+          if (( $(echo "$COVERAGE < ${{ env.COVERAGE_THRESHOLD }}" | bc -l) )); then
+            echo "Test coverage ($COVERAGE%) is below threshold (${{ env.COVERAGE_THRESHOLD }}%)"
+            exit 1
+          fi
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: src/backend/billing-service
+          push: false
+          tags: billing-service:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Node.js Event Processor Build & Test
+  event-processor:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: src/backend/event-processor/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: src/backend/event-processor
+        run: npm ci
+      
+      - name: Lint and type check
+        working-directory: src/backend/event-processor
+        run: |
+          npm run lint
+          npm run build
+      
+      - name: Run tests with coverage
+        working-directory: src/backend/event-processor
+        run: npm run test:coverage
+      
+      - name: Build Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: src/backend/event-processor
+          push: false
+          tags: event-processor:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Python Invoice Service Build & Test
+  invoice-service:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          poetry config virtualenvs.create false
+      
+      - name: Install dependencies
+        working-directory: src/backend/invoice-service
+        run: poetry install
+      
+      - name: Run tests and coverage
+        working-directory: src/backend/invoice-service
+        run: |
+          poetry run pytest --cov=src --cov-report=xml --cov-fail-under=${{ env.COVERAGE_THRESHOLD }}
+      
+      - name: Build Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: src/backend/invoice-service
+          push: false
+          tags: invoice-service:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Go Wallet Service Build & Test
+  wallet-service:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      
+      - name: Download dependencies
+        working-directory: src/backend/wallet-service
+        run: go mod download
+      
+      - name: Run tests with coverage
+        working-directory: src/backend/wallet-service
+        run: |
+          go test -race -coverprofile=coverage.out -covermode=atomic ./...
+          go tool cover -func=coverage.out
+      
+      - name: Build Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: src/backend/wallet-service
+          push: false
+          tags: wallet-service:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Final status check
+  status-check:
+    needs: [billing-service, event-processor, invoice-service, wallet-service]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check workflow status
+        run: |
+          if [ "${{ needs.billing-service.result }}" != "success" ] || \
+             [ "${{ needs.event-processor.result }}" != "success" ] || \
+             [ "${{ needs.invoice-service.result }}" != "success" ] || \
+             [ "${{ needs.wallet-service.result }}" != "success" ]; then
+            echo "One or more services failed to build or test"
+            exit 1
+          fi
