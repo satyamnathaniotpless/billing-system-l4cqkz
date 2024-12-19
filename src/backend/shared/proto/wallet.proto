@@ -1,0 +1,146 @@
+syntax = "proto3";
+
+package otpless.billing.wallet;
+
+// Import google/protobuf/timestamp.proto v3.0.0 for time tracking
+import "google/protobuf/timestamp.proto";
+// Import google/protobuf/empty.proto v3.0.0 for empty responses
+import "google/protobuf/empty.proto";
+
+// TransactionType defines all possible types of wallet transactions
+enum TransactionType {
+  CREDIT = 0;          // Add funds to wallet
+  DEBIT = 1;          // Remove funds from wallet
+  REFUND = 2;         // Refund transaction
+  ADJUSTMENT = 3;     // Manual balance adjustment
+  REVERSAL = 4;       // Transaction reversal
+}
+
+// TransactionStatus tracks the state of a transaction
+enum TransactionStatus {
+  INITIATED = 0;        // Transaction created
+  PROCESSING = 1;       // Transaction in progress
+  COMPLETED = 2;        // Transaction successful
+  FAILED = 3;          // Transaction failed
+  REVERSED = 4;        // Transaction reversed
+  PENDING_APPROVAL = 5; // Requires approval
+}
+
+// ErrorCode defines possible error conditions
+enum ErrorCode {
+  OK = 0;                    // No error
+  INSUFFICIENT_BALANCE = 1;  // Not enough funds
+  INVALID_AMOUNT = 2;        // Invalid transaction amount
+  WALLET_NOT_FOUND = 3;      // Wallet does not exist
+  DUPLICATE_TRANSACTION = 4; // Transaction already processed
+  CURRENCY_MISMATCH = 5;     // Currency does not match wallet
+  INTERNAL_ERROR = 6;        // System error
+}
+
+// Wallet represents a customer's wallet entity
+message Wallet {
+  string id = 1;                                    // Unique wallet identifier
+  string customer_id = 2;                          // Associated customer ID
+  double balance = 3;                              // Current balance
+  string currency = 4;                             // Wallet currency (e.g., USD, INR)
+  double low_balance_threshold = 5;                // Alert threshold for low balance
+  double high_balance_threshold = 6;               // Alert threshold for high balance
+  bool is_active = 7;                             // Wallet status
+  map<string, string> metadata = 8;               // Additional wallet metadata
+  google.protobuf.Timestamp created_at = 9;       // Creation timestamp
+  google.protobuf.Timestamp updated_at = 10;      // Last update timestamp
+  google.protobuf.Timestamp last_transaction_at = 11; // Last transaction timestamp
+}
+
+// Transaction represents a wallet transaction
+message Transaction {
+  string id = 1;                                  // Unique transaction ID
+  string wallet_id = 2;                          // Associated wallet ID
+  TransactionType type = 3;                      // Transaction type
+  TransactionStatus status = 4;                  // Transaction status
+  double amount = 5;                             // Transaction amount
+  string currency = 6;                           // Transaction currency
+  string description = 7;                        // Transaction description
+  string reference_id = 8;                       // External reference ID
+  string idempotency_key = 9;                    // Idempotency key
+  map<string, string> metadata = 10;             // Additional transaction metadata
+  ErrorCode error_code = 11;                     // Error code if failed
+  string error_message = 12;                     // Error description
+  google.protobuf.Timestamp created_at = 13;     // Creation timestamp
+  google.protobuf.Timestamp updated_at = 14;     // Last update timestamp
+}
+
+// CreateWalletRequest for wallet creation
+message CreateWalletRequest {
+  string customer_id = 1;                        // Customer ID
+  string currency = 2;                           // Initial currency
+  double initial_balance = 3;                    // Initial balance
+  double low_balance_threshold = 4;              // Low balance alert threshold
+  double high_balance_threshold = 5;             // High balance alert threshold
+  map<string, string> metadata = 6;              // Additional wallet metadata
+}
+
+// ProcessTransactionRequest for transaction processing
+message ProcessTransactionRequest {
+  string wallet_id = 1;                          // Target wallet ID
+  TransactionType type = 2;                      // Transaction type
+  double amount = 3;                             // Transaction amount
+  string currency = 4;                           // Transaction currency
+  string description = 5;                        // Transaction description
+  string reference_id = 6;                       // External reference ID
+  string idempotency_key = 7;                    // Idempotency key
+  map<string, string> metadata = 8;              // Additional transaction metadata
+}
+
+// GetTransactionHistoryRequest for fetching transaction history
+message GetTransactionHistoryRequest {
+  string wallet_id = 1;                          // Target wallet ID
+  google.protobuf.Timestamp start_date = 2;      // Start date filter
+  google.protobuf.Timestamp end_date = 3;        // End date filter
+  TransactionType type = 4;                      // Filter by type
+  TransactionStatus status = 5;                  // Filter by status
+  int32 page_size = 6;                          // Page size
+  string page_token = 7;                        // Pagination token
+}
+
+// TransactionHistoryResponse for paginated transaction history
+message TransactionHistoryResponse {
+  repeated Transaction transactions = 1;          // List of transactions
+  string next_page_token = 2;                    // Token for next page
+  int32 total_count = 3;                        // Total number of transactions
+}
+
+// GetWalletRequest for fetching wallet details
+message GetWalletRequest {
+  string wallet_id = 1;                          // Wallet ID to fetch
+}
+
+// UpdateWalletRequest for updating wallet settings
+message UpdateWalletRequest {
+  string wallet_id = 1;                          // Wallet ID to update
+  double low_balance_threshold = 2;              // New low balance threshold
+  double high_balance_threshold = 3;             // New high balance threshold
+  bool is_active = 4;                           // New active status
+  map<string, string> metadata = 5;              // Updated metadata
+}
+
+// WalletService provides comprehensive wallet management operations
+service WalletService {
+  // Creates a new wallet with specified configuration
+  rpc CreateWallet(CreateWalletRequest) returns (Wallet) {}
+  
+  // Retrieves wallet details
+  rpc GetWallet(GetWalletRequest) returns (Wallet) {}
+  
+  // Updates wallet settings
+  rpc UpdateWallet(UpdateWalletRequest) returns (Wallet) {}
+  
+  // Processes any type of wallet transaction
+  rpc ProcessTransaction(ProcessTransactionRequest) returns (Transaction) {}
+  
+  // Retrieves transaction history with filtering and pagination
+  rpc GetTransactionHistory(GetTransactionHistoryRequest) returns (TransactionHistoryResponse) {}
+  
+  // Deactivates a wallet
+  rpc DeactivateWallet(GetWalletRequest) returns (google.protobuf.Empty) {}
+}
