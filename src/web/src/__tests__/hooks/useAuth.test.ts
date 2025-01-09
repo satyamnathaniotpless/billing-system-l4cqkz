@@ -58,11 +58,13 @@ const createTestStore = () => {
   });
 };
 
-const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <BrowserRouter>
-    <Provider store={createTestStore()}>{children}</Provider>
-  </BrowserRouter>
-);
+const wrapper = ({ children }: { children: React.ReactNode }) => {
+  return (
+    <BrowserRouter>
+      <Provider store={createTestStore()}>{children}</Provider>
+    </BrowserRouter>
+  );
+};
 
 describe('useAuth Hook - Security Features', () => {
   beforeEach(() => {
