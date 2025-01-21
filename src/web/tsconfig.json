@@ -9,13 +9,13 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    
+    "sourceMap": true,
+    "verbatimModuleSyntax": true,
     /* Type Checking */
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    
     /* Module Resolution */
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
@@ -25,6 +25,6 @@
     }
   },
   "include": ["src"],
-  "exclude": ["node_modules", "dist", "build", "coverage"],
+  "exclude": ["node_modules", "dist", "build", "coverage", "**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"],
   "references": []
 }
